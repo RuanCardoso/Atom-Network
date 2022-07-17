@@ -37,10 +37,6 @@ namespace Atom.Core
                     break;
             }
         }
-
-        [MenuItem("Atom/Create Settings File")]
-        static void CreateSettingsFile() =>
-            AtomGlobal.CreateSettingsFile();
     }
 }
 #endif

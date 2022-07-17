@@ -42,13 +42,14 @@ namespace Atom.Core
             PlayerSettings.SetScriptingDefineSymbolsForGroup(targetGroup, string.Join(";", _defines.ToArray()));
         }
 #endif
-        public static void AOT()
+        public static bool AOT()
         {
             StaticCompositeResolver.Instance.Register(
                 GeneratedResolver.Instance,
                 StandardResolver.Instance);
             MessagePackSerializer.DefaultOptions =
                 MessagePackSerializerOptions.Standard.WithResolver(StaticCompositeResolver.Instance);
+            return true;
         }
     }
 }

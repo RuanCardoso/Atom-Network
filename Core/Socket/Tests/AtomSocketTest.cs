@@ -8,8 +8,6 @@ public class AtomSocketTest : MonoBehaviour
     private void Awake()
     {
         //atomStream = new AtomStream();
-
-        AtomGlobal.CreateSettingsFile();
     }
 
     private void Start()

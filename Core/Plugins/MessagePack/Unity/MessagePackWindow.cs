@@ -25,7 +25,7 @@ namespace MessagePack.Unity.Editor
         MpcArgument mpcArgument;
 
         //[MenuItem("Window/MessagePack/CodeGenerator")]
-        [MenuItem("Atom/Code Gen")]
+        [MenuItem("Atom/Open CodeGen")]
         public static void OpenWindow()
         {
             if (window != null)
@@ -34,7 +34,8 @@ namespace MessagePack.Unity.Editor
             }
 
             // will called OnEnable(singleton instance will be set).
-            GetWindow<MessagePackWindow>("CodeGen").Show();
+            MessagePackWindow _window = GetWindow<MessagePackWindow>("CodeGen");
+            _window.Show();
         }
 
         async void OnEnable()
@@ -144,23 +145,26 @@ namespace MessagePack.Unity.Editor
 
             EditorGUI.BeginDisabledGroup(invokingMpc);
             if (GUILayout.Button("Generate"))
-            {
-                var commnadLineArguments = mpcArgument.ToString();
-                UnityEngine.Debug.Log("Waiting.....");
-
-                invokingMpc = true;
-                try
-                {
-                    var log = await ProcessHelper.InvokeProcessStartAsync("mpc", commnadLineArguments);
-                    AssetDatabase.Refresh();
-                    UnityEngine.Debug.Log("Done!");
-                }
-                finally
-                {
-                    invokingMpc = false;
-                }
-            }
+                InitCodeGen();
             EditorGUI.EndDisabledGroup();
+        }
+
+        private async void InitCodeGen()
+        {
+            var commnadLineArguments = mpcArgument.ToString();
+            UnityEngine.Debug.Log("Waiting.....");
+
+            invokingMpc = true;
+            try
+            {
+                var log = await ProcessHelper.InvokeProcessStartAsync("mpc", commnadLineArguments);
+                AssetDatabase.Refresh();
+                UnityEngine.Debug.Log("Done!");
+            }
+            finally
+            {
+                invokingMpc = false;
+            }
         }
 
         void TextField(MpcArgument args, Func<MpcArgument, string> getter, Action<MpcArgument, string> setter)
