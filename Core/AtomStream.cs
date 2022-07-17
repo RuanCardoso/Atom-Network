@@ -15,6 +15,7 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core
@@ -39,11 +40,15 @@ namespace Atom.Core
             value = (byte)_memoryStream.ReadByte();
         public void Write(int value)
         {
+            int count = sizeof(int);
+            if (MaxUdpPacketSize < count)
+                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write int!");
+
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
             _buffer[2] = (byte)(value >> 16);
             _buffer[3] = (byte)(value >> 24);
-            _memoryStream.Write(_buffer, 0, 4);
+            _memoryStream.Write(_buffer, 0, count);
         }
 
         public void Read(out int value)
@@ -62,9 +67,13 @@ namespace Atom.Core
 
         public void Write(short value)
         {
+            int count = sizeof(short);
+            if (MaxUdpPacketSize < count)
+                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write short!");
+
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
-            _memoryStream.Write(_buffer, 0, 2);
+            _memoryStream.Write(_buffer, 0, count);
         }
 
         public void Read(out short value)
@@ -83,12 +92,16 @@ namespace Atom.Core
 
         public unsafe void Write(float value)
         {
+            int count = sizeof(float);
+            if (MaxUdpPacketSize < count)
+                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write float!");
+
             uint TmpValue = *(uint*)&value;
             _buffer[0] = (byte)TmpValue;
             _buffer[1] = (byte)(TmpValue >> 8);
             _buffer[2] = (byte)(TmpValue >> 16);
             _buffer[3] = (byte)(TmpValue >> 24);
-            _memoryStream.Write(_buffer, 0, 4);
+            _memoryStream.Write(_buffer, 0, count);
         }
 
         public unsafe void Read(out float value)
@@ -100,6 +113,10 @@ namespace Atom.Core
 
         public unsafe virtual void Write(double value)
         {
+            int count = sizeof(double);
+            if (MaxUdpPacketSize < count)
+                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write double!");
+
             ulong TmpValue = *(ulong*)&value;
             _buffer[0] = (byte)TmpValue;
             _buffer[1] = (byte)(TmpValue >> 8);
@@ -109,7 +126,7 @@ namespace Atom.Core
             _buffer[5] = (byte)(TmpValue >> 40);
             _buffer[6] = (byte)(TmpValue >> 48);
             _buffer[7] = (byte)(TmpValue >> 56);
-            _memoryStream.Write(_buffer, 0, 8);
+            _memoryStream.Write(_buffer, 0, count);
         }
 
         public unsafe virtual void Read(out double value)
@@ -162,10 +179,13 @@ namespace Atom.Core
         public void Write(string value, bool inStackAlloc = false)
         {
             int getByteCount = Encoding.GetByteCount(value);
+            if (MaxUdpPacketSize < getByteCount)
+                throw new Exception($"MaxUdpPacketSize is less than {getByteCount}, can't write string!");
+
             byte[] rentBytes = !inStackAlloc ? ArrayPool.Rent(getByteCount) : null;
             Span<byte> _rentBytes = !inStackAlloc ? rentBytes : stackalloc byte[getByteCount];
             int bytesCount = Encoding.GetBytes(value, _rentBytes);
-            _memoryStream.WriteByte((byte)bytesCount);
+            Write7BitEncodedInt(bytesCount);
             _memoryStream.Write(_rentBytes[..bytesCount]);
             if (!inStackAlloc)
                 ArrayPool.Return(rentBytes);
@@ -174,7 +194,7 @@ namespace Atom.Core
         public void Read(out string value)
         {
             ReadOnlySpan<byte> _bytes = _buffer;
-            int length = _memoryStream.ReadByte();
+            int length = Read7BitEncodedInt();
             Read(length);
             value = Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
         }
