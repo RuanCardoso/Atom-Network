@@ -33,6 +33,7 @@ namespace Atom.Core
             atomStream.Write(value);
         public static void Write(this string value, AtomStream atomStream) =>
             atomStream.Write(value);
+        
     }
 }
 #endif

@@ -46,7 +46,7 @@ namespace Atom.Core
         public static ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Create();
         public static string DebugMode { get; private set; } = "Debug";
         public static Encoding Encoding { get; private set; } = Encoding.ASCII;
-        public static ushort MaxUdpPacketSize { get; private set; } = 255;
+        public static ushort MaxUdpPacketSize { get; private set; } = 256;
         public static ushort MaxPlayers { get; private set; } = 512;
 
         static AtomGlobal()
@@ -94,6 +94,20 @@ namespace Atom.Core
                     DebugMode = atomSettings.DebugMode;
                     MaxUdpPacketSize = atomSettings.MaxUdpPacketSize;
                     MaxPlayers = atomSettings.MaxPlayers;
+
+                    switch (AtomGlobal.DebugMode)
+                    {
+                        case "Debug":
+                        case "debug":
+                            AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
+                            break;
+                        case "Release":
+                        case "release":
+                            AtomHelper.SetDefine(false, "ATOM_DEBUG", "ATOM_RELEASE");
+                            break;
+                        default:
+                            throw new System.Exception("Atom.Core: Debug mode not found!");
+                    }
 
                     try
                     {

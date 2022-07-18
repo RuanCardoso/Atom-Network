@@ -15,7 +15,6 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
 using System.IO;
-using System.Runtime.CompilerServices;
 using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core
@@ -49,7 +48,7 @@ namespace Atom.Core
             _buffer[1] = (byte)(value >> 8);
             _buffer[2] = (byte)(value >> 16);
             _buffer[3] = (byte)(value >> 24);
-            _memoryStream.Write(_buffer, 0, count);
+            Write(_buffer, 0, count);
         }
 
         public void Read(out int value)
@@ -218,6 +217,26 @@ namespace Atom.Core
                 else
                     throw new Exception("AtomStream: Read: End of stream reached, there is no data to read.");
             }
+        }
+
+        private void Write(byte[] buffer, int offset, int count)
+        {
+#if ATOM_DEBUG
+            try
+            {
+#endif
+                _memoryStream.Write(buffer, offset, count);
+#if ATOM_DEBUG
+            }
+            catch (NotSupportedException ex)
+            {
+                switch (ex.Message)
+                {
+                    case "Memory stream is not expandable.":
+                        throw new NotSupportedException("AtomStream: Write: There is not enough space in the buffer to write the data.");
+                }
+            }
+#endif
         }
 
         bool _disposable;

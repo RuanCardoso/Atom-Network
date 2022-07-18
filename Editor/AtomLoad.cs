@@ -15,6 +15,8 @@
 #if UNITY_EDITOR
 #if UNITY_2021_3_OR_NEWER
 using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
@@ -23,25 +25,10 @@ namespace Atom.Core
     public static class AtomLoad
     {
         [InitializeOnLoadMethod]
-        static void Load()
+        public static void Load()
         {
             if (!EditorApplication.isPlaying)
                 AtomGlobal.LoadSettingsFile();
-
-            switch (AtomGlobal.DebugMode)
-            {
-                case "Debug":
-                case "debug":
-                    AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
-                    break;
-                case "Release":
-                case "release":
-                    AtomHelper.SetDefine(false, "ATOM_DEBUG", "ATOM_RELEASE");
-                    break;
-                default:
-                    Debug.LogError("Atom.Core: Debug mode not found!");
-                    break;
-            }
         }
 
         [MenuItem("Atom/Setup", priority = -10)]
@@ -55,6 +42,13 @@ namespace Atom.Core
                 EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
             }
         }
+    }
+
+    class MyCustomBuildProcessor : IPreprocessBuildWithReport
+    {
+        public int callbackOrder => 0;
+        public void OnPreprocessBuild(BuildReport report) =>
+            AtomLoad.Load();
     }
 }
 #endif
