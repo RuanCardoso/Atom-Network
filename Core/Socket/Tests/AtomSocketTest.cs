@@ -12,7 +12,6 @@ public class AtomSocketTest : MonoBehaviour
 
     private void Start()
     {
-
     }
 
     private void Update()

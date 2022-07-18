@@ -25,7 +25,7 @@ namespace MessagePack.Unity.Editor
         MpcArgument mpcArgument;
 
         //[MenuItem("Window/MessagePack/CodeGenerator")]
-        [MenuItem("Atom/Open CodeGen")]
+        [MenuItem("Atom/Open Codegen")]
         public static void OpenWindow()
         {
             if (window != null)
@@ -34,8 +34,7 @@ namespace MessagePack.Unity.Editor
             }
 
             // will called OnEnable(singleton instance will be set).
-            MessagePackWindow _window = GetWindow<MessagePackWindow>("CodeGen");
-            _window.Show();
+            GetWindow<MessagePackWindow>("CodeGen").Show();
         }
 
         async void OnEnable()

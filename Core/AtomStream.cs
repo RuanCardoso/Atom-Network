@@ -41,9 +41,10 @@ namespace Atom.Core
         public void Write(int value)
         {
             int count = sizeof(int);
+#if ATOM_DEBUG
             if (MaxUdpPacketSize < count)
                 throw new Exception($"MaxUdpPacketSize is less than {count}, can't write int!");
-
+#endif
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
             _buffer[2] = (byte)(value >> 16);
@@ -68,9 +69,10 @@ namespace Atom.Core
         public void Write(short value)
         {
             int count = sizeof(short);
+#if ATOM_DEBUG
             if (MaxUdpPacketSize < count)
                 throw new Exception($"MaxUdpPacketSize is less than {count}, can't write short!");
-
+#endif
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
             _memoryStream.Write(_buffer, 0, count);
@@ -93,9 +95,10 @@ namespace Atom.Core
         public unsafe void Write(float value)
         {
             int count = sizeof(float);
+#if ATOM_DEBUG
             if (MaxUdpPacketSize < count)
                 throw new Exception($"MaxUdpPacketSize is less than {count}, can't write float!");
-
+#endif
             uint TmpValue = *(uint*)&value;
             _buffer[0] = (byte)TmpValue;
             _buffer[1] = (byte)(TmpValue >> 8);
@@ -114,9 +117,10 @@ namespace Atom.Core
         public unsafe virtual void Write(double value)
         {
             int count = sizeof(double);
+#if ATOM_DEBUG
             if (MaxUdpPacketSize < count)
                 throw new Exception($"MaxUdpPacketSize is less than {count}, can't write double!");
-
+#endif
             ulong TmpValue = *(ulong*)&value;
             _buffer[0] = (byte)TmpValue;
             _buffer[1] = (byte)(TmpValue >> 8);
@@ -199,8 +203,12 @@ namespace Atom.Core
             value = Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
         }
 
-        public void Read(int count, int offset = 0)
+        private void Read(int count, int offset = 0)
         {
+#if ATOM_DEBUG
+            if (count + offset > MaxUdpPacketSize)
+                throw new Exception($"MaxUdpPacketSize is less than {count + offset}, can't read!");
+#endif
             while (offset < count)
             {
                 int bytesRemaining = count - offset;
@@ -212,9 +220,16 @@ namespace Atom.Core
             }
         }
 
+        bool _disposable;
         public void Dispose()
         {
-            throw new NotImplementedException();
+            if (!_disposable)
+            {
+                _memoryStream.Dispose();
+                _disposable = true;
+            }
+            else
+                throw new Exception("AtomStream: Dispose: Already disposed!");
         }
     }
 }

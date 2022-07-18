@@ -24,7 +24,11 @@ namespace Atom.Core
     [MessagePackObject]
     public class AtomGlobal
     {
-        private const string _path = "./Assets/atom.json";
+        private static readonly bool _aot;
+        private static bool _init;
+        private const string _file_name = "atom";
+        private const string _res_path = "./Assets/Resources";
+        private const string _path = _res_path + "/" + _file_name + ".json";
 
         [MessagePackObject]
         public class AtomSettings
@@ -39,17 +43,16 @@ namespace Atom.Core
             public ushort MaxPlayers = 512;
         }
 
-        public static string DebugMode { get; } = "Debug";
         public static ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Create();
-        public static Encoding Encoding { get; } = Encoding.ASCII;
-        public static ushort MaxUdpPacketSize { get; } = 255;
-        public static ushort MaxPlayers { get; } = 512;
+        public static string DebugMode { get; private set; } = "Debug";
+        public static Encoding Encoding { get; private set; } = Encoding.ASCII;
+        public static ushort MaxUdpPacketSize { get; private set; } = 255;
+        public static ushort MaxPlayers { get; private set; } = 512;
 
-        static readonly bool _AOT = false;
         static AtomGlobal()
         {
-            if (!_AOT)
-                _AOT = AtomHelper.AOT();
+            if (!_aot)
+                _aot = AtomHelper.AOT();
 
             CreateSettingsFile();
 
@@ -63,25 +66,48 @@ namespace Atom.Core
 
         static void CreateSettingsFile()
         {
+#if UNITY_EDITOR
+            if (!Directory.Exists(_res_path)) Directory.CreateDirectory(_res_path);
+#endif
             if (!File.Exists(_path))
             {
-                using (Stream strFile = File.CreateText(_path).BaseStream)
+#if UNITY_EDITOR
+                using (TextWriter strFile = File.CreateText(_path))
                 {
-                    byte[] msgBytes = MessagePackSerializer.Serialize<AtomSettings>(new AtomSettings());
-                    strFile.Write(msgBytes, 0, msgBytes.Length);
+                    MessagePackSerializer.SerializeToJson(strFile, new AtomSettings());
+                }
+#endif
+            }
+            else
+                _init = true;
+        }
+
+        public static void LoadSettingsFile()
+        {
+            if (_init)
+            {
+                string strFile = Resources.Load<TextAsset>(_file_name).text;
+                byte[] msgBytes = MessagePackSerializer.ConvertFromJson(strFile);
+                AtomSettings atomSettings = MessagePackSerializer.Deserialize<AtomSettings>(msgBytes);
+                if (atomSettings != null)
+                {
+                    DebugMode = atomSettings.DebugMode;
+                    MaxUdpPacketSize = atomSettings.MaxUdpPacketSize;
+                    MaxPlayers = atomSettings.MaxPlayers;
+
+                    try
+                    {
+                        Encoding = Encoding.GetEncoding(atomSettings.Encoding);
+                    }
+                    catch
+                    {
+                        Debug.LogWarning("Atom: Encoding not found! Using default encoding (ASCII).");
+                        Encoding = Encoding.ASCII;
+                    }
                 }
             }
             else
-                LoadSettingsFile();
-        }
-
-        static void LoadSettingsFile()
-        {
-            using (Stream strFile = File.OpenText(_path).BaseStream)
-            {
-                AtomSettings atomSettings = MessagePackSerializer.Deserialize<AtomSettings>(strFile);
-                Debug.Log($"AtomSettings: {atomSettings.DebugMode} {atomSettings.Encoding} {atomSettings.MaxUdpPacketSize} {atomSettings.MaxPlayers}");
-            }
+                Debug.LogWarning("Atom: Settings file not loaded! Please, check if the file \"atom.json\" is in the \"Resources\" folder.");
         }
     }
 }
