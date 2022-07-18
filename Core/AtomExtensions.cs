@@ -33,7 +33,25 @@ namespace Atom.Core
             atomStream.Write(value);
         public static void Write(this string value, AtomStream atomStream) =>
             atomStream.Write(value);
-        
+        public static void Read(this ref int value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static void Read(this ref uint value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static void Read(this ref short value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static void Read(this ref ushort value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static void Read(this ref byte value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static void Read(this ref float value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static void Read(this ref double value, AtomStream atomStream) =>
+            atomStream.Read(out value);
+        public static string Read(this string _, AtomStream atomStream)
+        {
+            atomStream.Read(out string value);
+            return value;
+        }
     }
 }
 #endif
