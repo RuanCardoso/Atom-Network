@@ -95,6 +95,7 @@ namespace Atom.Core
                     MaxUdpPacketSize = atomSettings.MaxUdpPacketSize;
                     MaxPlayers = atomSettings.MaxPlayers;
 
+#if UNITY_EDITOR
                     switch (AtomGlobal.DebugMode)
                     {
                         case "Debug":
@@ -108,6 +109,7 @@ namespace Atom.Core
                         default:
                             throw new System.Exception("Atom.Core: Debug mode not found!");
                     }
+#endif
 
                     try
                     {
