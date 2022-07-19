@@ -47,10 +47,9 @@ namespace MessagePack.Resolvers
 
         static GeneratedResolverGetFormatterHelper()
         {
-            lookup = new global::System.Collections.Generic.Dictionary<global::System.Type, int>(2)
+            lookup = new global::System.Collections.Generic.Dictionary<global::System.Type, int>(1)
             {
-                { typeof(global::Atom.Core.AtomGlobal), 0 },
-                { typeof(global::Atom.Core.AtomGlobal.AtomSettings), 1 },
+                { typeof(global::Atom.Core.AtomGlobal.AtomSettings), 0 },
             };
         }
 
@@ -64,8 +63,7 @@ namespace MessagePack.Resolvers
 
             switch (key)
             {
-                case 0: return new MessagePack.Formatters.Atom.Core.AtomGlobalFormatter();
-                case 1: return new MessagePack.Formatters.Atom.Core.AtomGlobal_AtomSettingsFormatter();
+                case 0: return new MessagePack.Formatters.Atom.Core.AtomGlobal_AtomSettingsFormatter();
                 default: return null;
             }
         }

@@ -21,7 +21,6 @@ using UnityEngine;
 
 namespace Atom.Core
 {
-    [MessagePackObject]
     public class AtomGlobal
     {
         private static readonly bool _aot;
@@ -41,6 +40,10 @@ namespace Atom.Core
             public ushort MaxUdpPacketSize = 255;
             [Key("max_players")]
             public ushort MaxPlayers = 512;
+            [Key("max_rec_buffer")]
+            public int MaxRecBuffer = 8192;
+            [Key("max_send_buffer")]
+            public int MaxSendBuffer = 8192;
         }
 
         public static ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Create();
@@ -48,13 +51,19 @@ namespace Atom.Core
         public static Encoding Encoding { get; private set; } = Encoding.ASCII;
         public static ushort MaxUdpPacketSize { get; private set; } = 256;
         public static ushort MaxPlayers { get; private set; } = 512;
+        public static int MaxRecBuffer { get; private set; } = 8192;
+        public static int MaxSendBuffer { get; private set; } = 8192;
 
         static AtomGlobal()
         {
             if (!_aot)
                 _aot = AtomHelper.AOT();
 
+#if UNITY_EDITOR
             CreateSettingsFile();
+#else
+            _init = true;
+#endif
 
             if (MaxUdpPacketSize < 1) MaxUdpPacketSize = 1;
             if (MaxUdpPacketSize > 512)
@@ -66,17 +75,13 @@ namespace Atom.Core
 
         static void CreateSettingsFile()
         {
-#if UNITY_EDITOR
             if (!Directory.Exists(_res_path)) Directory.CreateDirectory(_res_path);
-#endif
             if (!File.Exists(_path))
             {
-#if UNITY_EDITOR
                 using (TextWriter strFile = File.CreateText(_path))
                 {
                     MessagePackSerializer.SerializeToJson(strFile, new AtomSettings());
                 }
-#endif
             }
             else
                 _init = true;
@@ -94,15 +99,14 @@ namespace Atom.Core
                     DebugMode = atomSettings.DebugMode;
                     MaxUdpPacketSize = atomSettings.MaxUdpPacketSize;
                     MaxPlayers = atomSettings.MaxPlayers;
-
+                    MaxRecBuffer = atomSettings.MaxRecBuffer;
+                    MaxSendBuffer = atomSettings.MaxSendBuffer;
 #if UNITY_EDITOR
-                    switch (AtomGlobal.DebugMode)
+                    switch (DebugMode.ToLower())
                     {
-                        case "Debug":
                         case "debug":
                             AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
                             break;
-                        case "Release":
                         case "release":
                             AtomHelper.SetDefine(false, "ATOM_DEBUG", "ATOM_RELEASE");
                             break;
@@ -110,7 +114,6 @@ namespace Atom.Core
                             throw new System.Exception("Atom.Core: Debug mode not found!");
                     }
 #endif
-
                     try
                     {
                         Encoding = Encoding.GetEncoding(atomSettings.Encoding);

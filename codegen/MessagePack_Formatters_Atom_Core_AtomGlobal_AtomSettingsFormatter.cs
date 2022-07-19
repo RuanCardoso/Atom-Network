@@ -26,6 +26,10 @@ namespace MessagePack.Formatters.Atom.Core
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxUdpPacketSize() => new byte[1 + 19] { 179, 109, 97, 120, 95, 117, 100, 112, 95, 112, 97, 99, 107, 101, 116, 95, 115, 105, 122, 101 };
         // max_players
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxPlayers() => new byte[1 + 11] { 171, 109, 97, 120, 95, 112, 108, 97, 121, 101, 114, 115 };
+        // max_rec_buffer
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxRecBuffer() => new byte[1 + 14] { 174, 109, 97, 120, 95, 114, 101, 99, 95, 98, 117, 102, 102, 101, 114 };
+        // max_send_buffer
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxSendBuffer() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 101, 110, 100, 95, 98, 117, 102, 102, 101, 114 };
 
         public void Serialize(ref global::MessagePack.MessagePackWriter writer, global::Atom.Core.AtomGlobal.AtomSettings value, global::MessagePack.MessagePackSerializerOptions options)
         {
@@ -36,7 +40,7 @@ namespace MessagePack.Formatters.Atom.Core
             }
 
             var formatterResolver = options.Resolver;
-            writer.WriteMapHeader(4);
+            writer.WriteMapHeader(6);
             writer.WriteRaw(GetSpan_DebugMode());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.DebugMode, options);
             writer.WriteRaw(GetSpan_Encoding());
@@ -45,6 +49,10 @@ namespace MessagePack.Formatters.Atom.Core
             writer.Write(value.MaxUdpPacketSize);
             writer.WriteRaw(GetSpan_MaxPlayers());
             writer.Write(value.MaxPlayers);
+            writer.WriteRaw(GetSpan_MaxRecBuffer());
+            writer.Write(value.MaxRecBuffer);
+            writer.WriteRaw(GetSpan_MaxSendBuffer());
+            writer.Write(value.MaxSendBuffer);
         }
 
         public global::Atom.Core.AtomGlobal.AtomSettings Deserialize(ref global::MessagePack.MessagePackReader reader, global::MessagePack.MessagePackSerializerOptions options)
@@ -87,6 +95,16 @@ namespace MessagePack.Formatters.Atom.Core
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxPlayers().Slice(1))) { goto FAIL; }
 
                         ____result.MaxPlayers = reader.ReadUInt16();
+                        continue;
+                    case 14:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxRecBuffer().Slice(1))) { goto FAIL; }
+
+                        ____result.MaxRecBuffer = reader.ReadInt32();
+                        continue;
+                    case 15:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxSendBuffer().Slice(1))) { goto FAIL; }
+
+                        ____result.MaxSendBuffer = reader.ReadInt32();
                         continue;
 
                 }
