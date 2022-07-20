@@ -62,7 +62,8 @@ namespace Atom.Core
     /// <summary>Defines the type of message to be sent.</summary>
     public enum Message : byte
     {
-        ConnectAndPing = 1
+        ConnectAndPing = 1,
+        Test,
     } // Zero is reserved for the default message.
 }
 #endif

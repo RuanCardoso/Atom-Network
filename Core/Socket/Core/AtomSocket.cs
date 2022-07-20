@@ -51,7 +51,7 @@ using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace Atom.Core
 {
-    public class AtomSocket
+    public class AtomSocket : MonoBehaviour
     {
         internal class AtomClient
         {
@@ -143,7 +143,7 @@ namespace Atom.Core
             _ids.Sort();
         }
 
-        public void Initialize(EndPoint endPoint)
+        protected void Initialize(EndPoint endPoint)
         {
             __Constructor__(endPoint);
             // Start the receive thread.
@@ -161,7 +161,7 @@ namespace Atom.Core
             InitSentThread();
         }
 
-        public IEnumerator Connect(EndPoint endPoint)
+        protected IEnumerator Connect(EndPoint endPoint)
         {
             while (true)
             {
@@ -370,16 +370,18 @@ namespace Atom.Core
             _dataToSend.Add(udpPacket);
         }
 
-        public void SendToClient(AtomStream dataStream, Channel channel, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint)
+        protected void SendToClient(AtomStream dataStream, Channel channel, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint)
         {
             if (opMode == Operation.Sequence)
                 SendToClient(dataStream, channel, targetMode, playerId, endPoint);
         }
 
-        public void SendToServer(AtomStream dataStream, Channel channel, Target targetMode)
+        protected void SendToServer(AtomStream dataStream, Channel channel, Target targetMode)
         {
-            if ((channel == Channel.ReliableAndOrderly || channel == Channel.Reliable) && _id == 0)
-                throw new Exception("[Neutron] -> You must connect to the server before sending data.");
+#if ATOM_DEBUG
+            if (((channel == Channel.ReliableAndOrderly || channel == Channel.Reliable) && _id == 0) || _destEndPoint == null)
+                throw new Exception("[Atom] -> You must connect to the server before sending data.");
+#endif
             Send(dataStream, channel, targetMode, Operation.Sequence, _id, _destEndPoint, 0);
         }
 
@@ -548,13 +550,10 @@ namespace Atom.Core
                                     }
                                     else
                                     {
-                                        // Send the acknowledgement to the remote host to confirm that we received the packet.
                                         Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
                                         byte[] data = atomStream.ReadNext();
                                         if (channelMode == Channel.Reliable)
                                         {
-                                            // Let's to check if the packet is a duplicate.
-                                            // If the packet is a duplicate, let's ignore it.
                                             if (!ChannelsData[chKey].Acknowledgements.TryAdd(seqAck, seqAck))
                                                 continue;
 
@@ -580,7 +579,6 @@ namespace Atom.Core
                                                         var KvP = KvPSenquentialData[i];
                                                         if (KvP.Key > ChannelsData[chKey].LastProcessedSequentialAck)
                                                         {
-                                                            // Let's process the data and send it to the remote host again.
                                                             using (AtomStream realibleAndOrdelyStream = new())
                                                             {
                                                                 realibleAndOrdelyStream.SetBuffer(KvP.Value);
@@ -646,7 +644,7 @@ namespace Atom.Core
 
         private void ReturnId(ushort id) => _ids.Push(id, true);
         public Socket GetSocket() => _socket;
-        public void Close()
+        protected void Close()
         {
             try
             {

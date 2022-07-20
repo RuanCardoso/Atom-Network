@@ -23,16 +23,6 @@ namespace Atom.Core
         private void Awake()
         {
             AtomGlobal.LoadSettingsFile();
-            Debug.LogError(AtomGlobal.MaxUdpPacketSize);
-        }
-
-        private void Start()
-        {
-
-        }
-        private void Update()
-        {
-
         }
     }
 }
