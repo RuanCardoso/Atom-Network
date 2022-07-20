@@ -39,18 +39,23 @@
 
 #if UNITY_2021_3_OR_NEWER
 using Atom.Core.Wrappers;
+using System;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using UnityEngine;
+using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace Atom.Core
 {
     public class AtomSocket
     {
-        public class AtomClient
+        internal class AtomClient
         {
-            public AtomClient(ushort id, EndPoint endPoint)
+            internal AtomClient(ushort id, EndPoint endPoint)
             {
                 Id = id;
                 EndPoint = endPoint;
@@ -89,8 +94,6 @@ namespace Atom.Core
         /// I made a wrapper for this because a lot of garbage will be created if we use the IPEndPoint directly.
         /// </summary>
         private EndPoint _destEndPoint;
-        /// <summary>The endpoint used to listen for data from the remote host.</summary>
-        private EndPoint _srcEndPoint;
         /// <summary>
         /// Used to cancel the receive and send operations, called when the socket is closed.
         /// Prevents the CPU from spinning, Thread.Abort() is not recommended, because it's not a good way to stop a thread and not work on Linux OS.
@@ -99,8 +102,8 @@ namespace Atom.Core
         /// <summary> Used to enqueue the received data, the data is enqueued in a queue, and the queue is processed in a thread.</summary>
         private BlockingCollection<AtomMessage> _dataToSend;
         /// <summary>The list to store the connected clients. </summary>
-        internal ConcurrentDictionary<EndPoint, AtomClient> ClientsByEndPoint = new();
-        internal ConcurrentDictionary<ushort, AtomClient> ClientsById = new();
+        private readonly ConcurrentDictionary<EndPoint, AtomClient> ClientsByEndPoint = new();
+        private readonly ConcurrentDictionary<ushort, AtomClient> ClientsById = new();
         /// <summary>
         /// Store the information of the channels.
         /// Ex: SentSequence, RecvSequence, Acknowledge....etc
@@ -109,35 +112,30 @@ namespace Atom.Core
         /// The acknowledgment number is used to confirm that the packet has been received, if not, the packet is resent.
         /// The sequence number is used to reorder packets, if the packet is out of order, the packet is reordered.
         /// </summary>
-        internal ConcurrentDictionary<(ushort, byte), AtomChannel> ChannelsData = new();
+        private readonly ConcurrentDictionary<(ushort, byte), AtomChannel> ChannelsData = new();
         /// <summary>List of exlusive id's, used to prevent the same id to be used twice.</summary>
-        private AtomSafelyQueue<ushort> _ids = new(true);
+        private readonly AtomSafelyQueue<ushort> _ids = new(true);
         /// <summary>
         /// Returns whether the "Instance" is the Server or the Client.
         /// </summary>
         public bool IsServer => !_isConnected;
 
-        /// <summary>
-        /// Associates a Socket with a local endpoint.
-        /// </summary>
-        public void Bind(EndPoint endPoint)
+#pragma warning disable IDE1006 // Estilos de Nomenclatura
+        private void __Constructor__(EndPoint endPoint)
+#pragma warning restore IDE1006 // Estilos de Nomenclatura
         {
-            _cancelTokenSource = new();
-            _dataToSend = new();
             _socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
             {
                 // The ReceiveBufferSize property gets or sets the number of bytes that you are expecting to store in the receive buffer for each read operation. 
                 // This property actually manipulates the network buffer space allocated for receiving incoming data.
-                ReceiveBufferSize = 8192,
+                ReceiveBufferSize = AtomGlobal.MaxRecBuffer,
                 // The SendBufferSize property gets or sets the number of bytes that you are expecting to store in the send buffer for each send operation.
                 // This property actually manipulates the network buffer space allocated for sending outgoing data.
-                SendBufferSize = 8192,
+                SendBufferSize = AtomGlobal.MaxSendBuffer,
             };
-            // Bind the socket to the endpoint.
-            // This address and port will be used to receive data from the remote host.
             _socket.Bind(endPoint);
-            // The LocalEndPoint property gets the local endpoint of the socket.
-            _srcEndPoint = endPoint;
+            _cancelTokenSource = new();
+            _dataToSend = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
             for (ushort i = 1; i < ushort.MaxValue; i++)
@@ -145,11 +143,9 @@ namespace Atom.Core
             _ids.Sort();
         }
 
-        /// <summary>
-        /// Initialize the send and receive channels.
-        /// </summary>
-        public void InitThreads()
+        public void Initialize(EndPoint endPoint)
         {
+            __Constructor__(endPoint);
             // Start the receive thread.
             // The Unity API doesn't allow to be called from a thread other than the main thread.
             // The Unity API wil be dispatched to the main thread.
@@ -165,158 +161,153 @@ namespace Atom.Core
             InitSentThread();
         }
 
-        /// <summary>
-        /// Connect to the remote host.
-        /// </summary>
         public IEnumerator Connect(EndPoint endPoint)
         {
             while (true)
             {
-                // The endpoint used to send data to the remote host, client only.
                 _destEndPoint = endPoint;
-                using (NeutronStream packet = Neutron.PooledNetworkStreams.Pull())
+                using (AtomStream message = new())
                 {
-                    var writer = packet.Writer;
-                    writer.WritePacket((byte)PacketType.ConnectAndPing);
+                    message.Write((byte)Message.ConnectAndPing);
                     // The first packet is used to establish the connection.
                     // We are using unrealible channel, because we don't have and exclusive Id for the connection.
                     // We need an id to identify the connection, and the id is the "symbolic link" for the EndPoint...
                     // As we are using an unrealible channel, we need to send connection packets until we get a response.
-                    SendToServer(packet, ChannelMode.Unreliable, TargetMode.Single);
+                    SendToServer(message, Channel.Unreliable, Target.Single);
                 }
-                // Wait for the response and ping if connected...
                 yield return new WaitForSeconds(0.2f);
             }
         }
 
-        /// <summary>
-        /// Relay the data to the remote host.
-        /// </summary>
         private void Relay(ushort playerId)
         {
-            for (int iCM = 0; iCM < _channelModes.Length; iCM++)
-            {
-                ChannelMode channelMode = _channelModes[iCM];
-                if (ChannelsData.TryGetValue((playerId, (byte)channelMode), out ChannelData channelData))
-                {
-                    var packetsToRelay = channelData.PacketsToReTransmit.ToList();
-                    for (int i = 0; i < packetsToRelay.Count; i++)
-                    {
-                        var packetToRelay = packetsToRelay[i];
-                        TransmissionPacket transmissionPacket = packetToRelay.Value;
-                        // Calc the last time we sent the packet.
-                        TimeSpan currentTime = DateTime.UtcNow.Subtract(transmissionPacket.LastSent);
-                        // If the time elapsed is greater than X second, the packet is re-sent if the packet is not acknowledged.
-                        if (currentTime.TotalSeconds >= /*ping time +*/ 0d) // formula: ping time + relay time, ping time is automatically compensated and added as the check is done on every ping packet.
-                        {
-                            LogHelper.Error($"[Neutron] -> Re-try to send packet {packetToRelay.Key} -> : {transmissionPacket.SeqAck.ToString()} -> {packetToRelay.Value.Data.ChannelMode}");
+            //for (int iCM = 0; iCM < _channelModes.Length; iCM++)
+            //{
+            //    Channel channelMode = _channelModes[iCM];
+            //    if (ChannelsData.TryGetValue((playerId, (byte)channelMode), out AtomChannel channelData))
+            //    {
+            //        var packetsToRelay = channelData.MessagesToRelay.ToList();
+            //        for (int i = 0; i < packetsToRelay.Count; i++)
+            //        {
+            //            var packetToRelay = packetsToRelay[i];
+            //            AtomRelayMessage transmissionPacket = packetToRelay.Value;
+            //            // Calc the last time we sent the packet.
+            //            TimeSpan currentTime = DateTime.UtcNow.Subtract(transmissionPacket.LastSent);
+            //            // If the time elapsed is greater than X second, the packet is re-sent if the packet is not acknowledged.
+            //            if (currentTime.TotalSeconds >= /*ping time +*/ 0d) // formula: ping time + relay time, ping time is automatically compensated and added as the check is done on every ping packet.
+            //            {
+            //                Debug.LogError($"[Neutron] -> Re-try to send packet {packetToRelay.Key} -> : {transmissionPacket.SeqAck.ToString()} -> {packetToRelay.Value.Data.ChannelMode}");
 
-                            // if (!pKvP.Value.PacketsToReTransmit.ContainsKey(transmissionPacket.SeqAck))
-                            //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} not found.");
-                            // else
-                            //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} found.");
+            //                // if (!pKvP.Value.PacketsToReTransmit.ContainsKey(transmissionPacket.SeqAck))
+            //                //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} not found.");
+            //                // else
+            //                //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} found.");
 
-                            (int, ushort) PTTKey = (transmissionPacket.SeqAck, transmissionPacket.Data.PlayerId);
-                            if (transmissionPacket.IsDisconnected())
-                                channelData.PacketsToReTransmit.Remove(PTTKey, out _);
-                            else
-                                Enqueue(transmissionPacket.Data);
-                            // Set the last time to current time when the packet is sent.
-                            transmissionPacket.LastSent = DateTime.UtcNow;
-                        }
-                    }
-                }
-                else
-                    LogHelper.Error($"ChannelData not found for playerId: {playerId} and channelMode: {channelMode}");
-            }
+            //                (int, ushort) PTTKey = (transmissionPacket.SeqAck, transmissionPacket.Data.PlayerId);
+            //                if (transmissionPacket.IsDisconnected())
+            //                    channelData.PacketsToReTransmit.Remove(PTTKey, out _);
+            //                else
+            //                    Enqueue(transmissionPacket.Data);
+            //                // Set the last time to current time when the packet is sent.
+            //                transmissionPacket.LastSent = DateTime.UtcNow;
+            //            }
+            //        }
+            //    }
+            //    else
+            //        LogHelper.Error($"ChannelData not found for playerId: {playerId} and channelMode: {channelMode}");
+            //}
         }
 
-        /// <summary>
-        /// Process the internal packet queue.
-        /// </summary>
-        internal PacketType OnServerMessageCompleted(NeutronStream stream, ushort playerId, EndPoint endPoint, ChannelMode channelMode, TargetMode targetMode, OperationMode opMode, AtomSocket udp)
+        private void OnMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
         {
-            var reader = stream.Reader;
-            var writer = stream.Writer;
-            // Convert byte to packet type.
-            var packetType = (PacketType)reader.ReadByte();
-            switch (packetType)
+            if (IsServer)
+                OnServerMessageCompleted(stream, playerId, endPoint, channelMode, targetMode, opMode, this);
+            else
+                OnClientMessageCompleted(stream, playerId, endPoint, channelMode, targetMode, opMode, this);
+        }
+
+        protected virtual Message OnServerMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
+        {
+            stream.Read(out byte value);
+            Message message = (Message)value;
+            switch (message)
             {
-                // Let's process the packet.
-                case PacketType.ConnectAndPing:
+                case Message.ConnectAndPing:
                     {
                         if (playerId == 0)
                         {
                             if (ClientsByEndPoint.ContainsKey(endPoint))
                             {
-                                if (ClientsByEndPoint.Remove(endPoint, out SocketClient socketClient))
+                                if (ClientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient))
                                 {
-                                    RemoveChannel(socketClient.Id);
-                                    ReturnId(socketClient.Id);
+                                    if (ClientsById.TryRemove(socketClient.Id, out _))
+                                    {
+                                        RemoveChannel(socketClient.Id);
+                                        ReturnId(socketClient.Id);
+                                    }
+                                    else
+                                        Debug.LogError($"Client {socketClient.Id} not found in ClientsById.");
                                 }
+                                else
+                                    Debug.LogError($"Failed to remove client {socketClient.Id} from the list.");
                             }
 
                             if (GetAvailableId(out ushort id))
                             {
-                                // Add the new client to server.
-                                if (ClientsByEndPoint.TryAdd(endPoint, new SocketClient(id, endPoint)))
+                                AtomClient client = new(id, endPoint);
+                                if (ClientsByEndPoint.TryAdd(endPoint, client))
                                 {
-                                    LogHelper.Error($"Added a new player {id}");
-                                    // Create the local channels to send and receive data.
-                                    AddChannel(id);
-                                    writer.WritePacket((byte)PacketType.ConnectAndPing);
-                                    writer.Write(id);
-                                    udp.SendToClient(stream, channelMode, targetMode, opMode, playerId, endPoint);
-                                    // Add the new client to server.
+                                    if (ClientsById.TryAdd(id, client))
+                                    {
+                                        AddChannel(id);
+                                        stream.Write((byte)Message.ConnectAndPing);
+                                        stream.Write(id);
+                                        udp.SendToClient(stream, channelMode, targetMode, opMode, playerId, endPoint);
+                                    }
+                                    else
+                                        Debug.LogError("Client not added!");
                                 }
                                 else
-                                    LogHelper.Error("Client not added!");
+                                    Debug.LogError("Client not added!");
                             }
                             else
-                                LogHelper.Error("[Neutron] -> No available id's.");
+                                Debug.LogError("No available id's!");
                         }
                         else
                         {
-                            Relay(playerId);  // Let's relay the packets to the client.
-                                              // Send the ping packet to the client.
-                            writer.WritePacket((byte)PacketType.ConnectAndPing);
+                            Relay(playerId);
+                            stream.Write((byte)Message.ConnectAndPing);
                             udp.SendToClient(stream, channelMode, targetMode, opMode, playerId, endPoint);
                         }
                     }
                     break;
                 default:
-                    return packetType; // If not an internal packet, return the packet type to process it.
+                    return message;
             }
-            // If is a internal packet, return null to ignore it.
             return default;
         }
 
-        /// <summary>
-        /// Process the internal packet queue.
-        /// </summary>
-        internal PacketType OnClientMessageCompleted(NeutronStream stream, ushort playerId, EndPoint endPoint, ChannelMode channelMode, TargetMode targetMode, OperationMode opMode, AtomSocket udp)
+        protected virtual Message OnClientMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
         {
-            var reader = stream.Reader;
-            var writer = stream.Writer;
-            // Convert byte to packet type.
-            var packetType = (PacketType)reader.ReadByte();
-            switch (packetType)
+            stream.Read(out byte value);
+            Message message = (Message)value;
+            switch (message)
             {
-                case PacketType.ConnectAndPing:
+                case Message.ConnectAndPing:
                     if (_id == 0)
                     {
-                        _id = reader.ReadUShort();
-                        for (ushort i = 0; i < ushort.MaxValue; i++) // Create the local channels to send and receive data.
-                            AddChannel(i); // One channel for each id.
+                        _id.Read(stream);
+                        for (ushort i = 0; i < ushort.MaxValue; i++)
+                            AddChannel(i);
                         _isConnected = true;
                     }
                     else
                         Relay(playerId);  // Let's relay the packets to the server.
                     break;
                 default:
-                    return packetType; // If not an internal packet, return the packet type to process it.
+                    return message; // If not an private packet, return the packet type to process it.
             }
-            // If is a internal packet, return null to ignore it.
+            // If is a private packet, return null to ignore it.
             return default;
         }
 
@@ -324,9 +315,9 @@ namespace Atom.Core
         {
             for (int i = 0; i < _channelModes.Length; i++)
             {
-                ChannelMode channelMode = _channelModes[i];
-                if (!ChannelsData.TryAdd((playerId, (byte)channelMode), new ChannelData()))
-                    LogHelper.Error($"Channel {channelMode} already exists!");
+                Channel channelMode = _channelModes[i];
+                if (!ChannelsData.TryAdd((playerId, (byte)channelMode), new AtomChannel()))
+                    Debug.LogError($"Channel {channelMode} already exists!");
             }
         }
 
@@ -334,119 +325,94 @@ namespace Atom.Core
         {
             for (int i = 0; i < _channelModes.Length; i++)
             {
-                ChannelMode channelMode = _channelModes[i];
-                if (!ChannelsData.Remove((playerId, (byte)channelMode), out _))
-                    LogHelper.Error($"Channel {channelMode} not found!");
+                Channel channelMode = _channelModes[i];
+                if (!ChannelsData.TryRemove((playerId, (byte)channelMode), out _))
+                    Debug.LogError($"Channel {channelMode} not found!");
             }
         }
 
-        private void ConfigureRetransmission(UdpPacket udpPacket, EndPoint endPoint, ushort playerId)
+        private void Relay(AtomMessage udpPacket, EndPoint endPoint, ushort playerId)
         {
-            if (!udpPacket.IsRTS)
-            {
-                if (udpPacket.ChannelMode == ChannelMode.Reliable || udpPacket.ChannelMode == ChannelMode.ReliableSequenced)
-                {
-                    // Don't create the transmission packet in Ack packets. 
-                    // because we are retransmitting the packet to the owner of the packet, in this case,
-                    // who takes care of the retransmission is the owner of the packet, 
-                    // so we can't re-transmit the packet because it already does that, otherwise it's in a retransmission loop.
-                    // Only clients who do not own(owner) the packet can re-transmit the packet.
-                    if (udpPacket.OperationMode == OperationMode.Acknowledgement)
-                        return;
+            //if (!udpPacket.IsRTS)
+            //{
+            //    if (udpPacket.ChannelMode == ChannelMode.Reliable || udpPacket.ChannelMode == ChannelMode.ReliableSequenced)
+            //    {
+            //        // Don't create the transmission packet in Ack packets. 
+            //        // because we are retransmitting the packet to the owner of the packet, in this case,
+            //        // who takes care of the retransmission is the owner of the packet, 
+            //        // so we can't re-transmit the packet because it already does that, otherwise it's in a retransmission loop.
+            //        // Only clients who do not own(owner) the packet can re-transmit the packet.
+            //        if (udpPacket.OperationMode == OperationMode.Acknowledgement)
+            //            return;
 
-                    UdpPacket rtsUdpPacket = new UdpPacket(udpPacket.SeqAck, udpPacket.PlayerId, udpPacket.LastSent, endPoint, udpPacket.OperationMode, TargetMode.Single, udpPacket.ChannelMode, udpPacket.ChannelData, udpPacket.Data);
-                    rtsUdpPacket.IsRTS = true;
-                    // If channelData contains the packet, it means that the packet was lost, and we need to re-transmit it.
-                    (int, ushort) PTTKey = (rtsUdpPacket.SeqAck, playerId);
-                    if (!rtsUdpPacket.ChannelData.PacketsToReTransmit.ContainsKey(PTTKey))
-                        rtsUdpPacket.ChannelData.PacketsToReTransmit.TryAdd(PTTKey, new TransmissionPacket(rtsUdpPacket.SeqAck, DateTime.UtcNow, rtsUdpPacket));
-                    else
-                    {
-                        if (rtsUdpPacket.ChannelData.PacketsToReTransmit[PTTKey].IsDisconnected())
-                            rtsUdpPacket.ChannelData.PacketsToReTransmit.Remove(PTTKey, out _);
-                    }
-                }
-            }
-            else
-            { /*Prevent duplicate RTS Packet*/ }
+            //        UdpPacket rtsUdpPacket = new UdpPacket(udpPacket.SeqAck, udpPacket.PlayerId, udpPacket.LastSent, endPoint, udpPacket.OperationMode, TargetMode.Single, udpPacket.ChannelMode, udpPacket.ChannelData, udpPacket.Data);
+            //        rtsUdpPacket.IsRTS = true;
+            //        // If channelData contains the packet, it means that the packet was lost, and we need to re-transmit it.
+            //        (int, ushort) PTTKey = (rtsUdpPacket.SeqAck, playerId);
+            //        if (!rtsUdpPacket.ChannelData.PacketsToReTransmit.ContainsKey(PTTKey))
+            //            rtsUdpPacket.ChannelData.PacketsToReTransmit.TryAdd(PTTKey, new TransmissionPacket(rtsUdpPacket.SeqAck, DateTime.UtcNow, rtsUdpPacket));
+            //        else
+            //        {
+            //            if (rtsUdpPacket.ChannelData.PacketsToReTransmit[PTTKey].IsDisconnected())
+            //                rtsUdpPacket.ChannelData.PacketsToReTransmit.Remove(PTTKey, out _);
+            //        }
+            //    }
+            //}
+            //else
+            //{ /*Prevent duplicate RTS Packet*/ }
         }
 
-        /// <summary>
-        /// Enqueue the data to the send queue.
-        /// </summary>
-        private void Enqueue(UdpPacket udpPacket)
+        private void Enqueue(AtomMessage udpPacket)
         {
             // Enqueue data to send.
             // This operation is thread safe, it's necessary to lock the queue? Yes, because data can be enqueued from different threads,
             // example: Unity's main thread and the receive thread.
-            _dataToSend.Push(udpPacket);
+            _dataToSend.Add(udpPacket);
         }
 
-        /// <summary>
-        /// Send the data to the remote host. Server->Client.
-        /// </summary>
-        public void SendToClient(NeutronStream dataStream, ChannelMode channel, TargetMode targetMode, OperationMode opMode, ushort playerId, EndPoint endPoint)
+        public void SendToClient(AtomStream dataStream, Channel channel, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint)
         {
-            if (opMode == OperationMode.Sequence)
+            if (opMode == Operation.Sequence)
                 SendToClient(dataStream, channel, targetMode, playerId, endPoint);
         }
 
-        /// <summary>
-        /// Send the data to the remote host. Client->Server.
-        /// </summary>
-        public void SendToServer(NeutronStream dataStream, ChannelMode channel, TargetMode targetMode)
+        public void SendToServer(AtomStream dataStream, Channel channel, Target targetMode)
         {
-            if ((channel == ChannelMode.ReliableSequenced || channel == ChannelMode.Reliable) && _id == 0)
+            if ((channel == Channel.ReliableAndOrderly || channel == Channel.Reliable) && _id == 0)
                 throw new Exception("[Neutron] -> You must connect to the server before sending data.");
-            Send(dataStream, channel, targetMode, OperationMode.Sequence, _id, _destEndPoint, 0);
+            Send(dataStream, channel, targetMode, Operation.Sequence, _id, _destEndPoint, 0);
         }
 
-        /// <summary>
-        /// Send the data to the remote host. Server->Client.
-        /// </summary>
-        private void SendToClient(NeutronStream dataStream, ChannelMode channel, TargetMode targetMode, ushort playerId, EndPoint endPoint)
+        private void SendToClient(AtomStream dataStream, Channel channel, Target targetMode, ushort playerId, EndPoint endPoint)
         {
-            Send(dataStream, channel, targetMode, OperationMode.Data, playerId, endPoint, 0);
+            Send(dataStream, channel, targetMode, Operation.Data, playerId, endPoint, 0);
         }
 
-        private void Send(NeutronStream dataStream, ChannelMode channelMode, TargetMode targetMode, OperationMode opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
+        private void Send(AtomStream dataStream, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
         {
-            // Get the data from the stream.
-            // This data will be sent to the remote host.
-            var data = dataStream.Writer.GetBufferAsReadOnlySpan();
-            // Let's to create the packet.
-            // The header includes the channel, the sequence number and the acknowledgment number for reliable channels.
-            using (NeutronStream packet = Neutron.PooledNetworkStreams.Pull())
+            var data = dataStream.GetBuffer();
+            using (AtomStream packet = new())
             {
-                var writer = packet.Writer;
-                writer.Write((byte)channelMode);
-                writer.Write((byte)targetMode);
-                writer.Write((byte)opMode);
-                writer.Write(playerId);
-                if (channelMode == ChannelMode.Reliable || channelMode == ChannelMode.ReliableSequenced)
+                packet.Write((byte)channelMode);
+                packet.Write((byte)targetMode);
+                packet.Write((byte)opMode);
+                packet.Write(playerId);
+                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
                 {
-                    (ushort, byte) chKey = (playerId, (byte)channelMode);
-                    ChannelData channelData = ChannelsData[chKey];
-                    // If sequence is 0, the packet is sent as a new packet, otherwise it is a re-transmission.
+                    (ushort, byte) channelKey = (playerId, (byte)channelMode);
+                    AtomChannel channelData = ChannelsData[channelKey];
                     if (seqAck == 0)
                         seqAck = Interlocked.Increment(ref channelData.SentAck);
-                    // The client sends the sequence number(4 bytes(int)) and the data.
-                    writer.Write(seqAck);
-                    writer.Write(data);
-                    // Create a copy of the packet.
-                    byte[] pData = writer.GetBufferAsCopy();
-                    // Create UdpPacket to send.
-                    // The packet includes the data and the endpoint.
-                    // The packet is sent to the remote host.
-                    UdpPacket udpPacket = new UdpPacket(seqAck, playerId, DateTime.UtcNow, endPoint, opMode, targetMode, channelMode, channelData, pData);
-                    // Send the reliable packet.
+                    packet.Write(seqAck);
+                    packet.Write(data);
+                    byte[] buffer = packet.GetBufferAsCopy();
+                    AtomMessage udpPacket = new(seqAck, playerId, DateTime.UtcNow, endPoint, opMode, targetMode, channelMode, channelData, buffer);
                     Enqueue(udpPacket);
                 }
-                else if (channelMode == ChannelMode.Unreliable)
+                else if (channelMode == Channel.Unreliable)
                 {
-                    // Send the unreliable packet.
-                    writer.Write(data);
-                    UdpPacket udpPacket = new UdpPacket(playerId, endPoint, opMode, targetMode, channelMode, writer.GetBufferAsCopy());
+                    packet.Write(data);
+                    AtomMessage udpPacket = new(playerId, endPoint, opMode, targetMode, channelMode, packet.GetBufferAsCopy());
                     Enqueue(udpPacket);
                 }
             }
@@ -461,36 +427,30 @@ namespace Atom.Core
                 {
                     // Le't get the data from the queue and send it.
                     // This collection is blocked until the data is available, prevents de CPU from spinning.
-                    UdpPacket udpPacket = _dataToSend.Pull();
+                    AtomMessage message = _dataToSend.Take();
                     if (IsServer)
                     {
                         //! "CreateTransmissionPacket(udpPacket)" must be called before _socket.SendTo(udpPacket.Data, udpPacket.EndPoint), otherwise the packet will be lost.
                         //! Sometimes the Ack will arrive before the transmission packet is created, and the packet will be lost, so we need to create the transmission packet before sending the packet.
-
                         //! "isConnected" is false, is server, so we need to send the data to the client or clients.
-                        switch (udpPacket.TargetMode)
+                        switch (message.Target)
                         {
-                            // Send and Create the transmission packet.
-                            // This transmission packet is used to re-transmit the packet if the packet is lost.
-                            // The packet is not created if the packet is an acknowledgment packet or is a duplicate packet.
-                            case TargetMode.All:
-                                ConfigureRetransmission(udpPacket, udpPacket.EndPoint, udpPacket.PlayerId);
-                                _socket.SendTo(udpPacket.Data, udpPacket.EndPoint);
-                                // Send the data to all the clients.
+                            case Target.All:
+                                Relay(message, message.EndPoint, message.PlayerId);
+                                _socket.SendTo(message.Data, message.EndPoint);
                                 foreach (var KvP in ClientsByEndPoint.ToList())
                                 {
-                                    if (!KvP.Key.Equals(udpPacket.EndPoint))
+                                    if (!KvP.Key.Equals(message.EndPoint))
                                     {
-                                        SocketClient socketClient = KvP.Value;
-                                        ConfigureRetransmission(udpPacket, socketClient.EndPoint, socketClient.Id);
-                                        // Send the packet to the remote host.
-                                        _socket.SendTo(udpPacket.Data, socketClient.EndPoint);
+                                        AtomClient socketClient = KvP.Value;
+                                        Relay(message, socketClient.EndPoint, socketClient.Id);
+                                        _socket.SendTo(message.Data, socketClient.EndPoint);
                                     }
                                     else
                                         continue;
                                 }
                                 break;
-                            case TargetMode.Others:
+                            case Target.Others:
                                 // // If the packet is sent to others, it's necessary to send it to all the clients except the sender.
                                 // // The sender is the owner of the packet, so we don't need to send it to the sender.
                                 // foreach (var KvP in ClientsByEndPoint.ToList())
@@ -506,18 +466,17 @@ namespace Atom.Core
                                 //         continue;
                                 // }
                                 break;
-                            case TargetMode.Single:
-                                ConfigureRetransmission(udpPacket, udpPacket.EndPoint, udpPacket.PlayerId);
-                                // Send the packet to the remote host.
-                                _socket.SendTo(udpPacket.Data, udpPacket.EndPoint);
+                            case Target.Single:
+                                Relay(message, message.EndPoint, message.PlayerId);
+                                _socket.SendTo(message.Data, message.EndPoint);
                                 break;
                         }
                     }
                     else // "isConnected" is true, is client, so we need to send the data to the server.
                     {
-                        ConfigureRetransmission(udpPacket, udpPacket.EndPoint, udpPacket.PlayerId);
+                        Relay(message, message.EndPoint, message.PlayerId);
                         // Send the packet to the remote host.
-                        _socket.SendTo(udpPacket.Data, udpPacket.EndPoint);
+                        _socket.SendTo(message.Data, message.EndPoint);
                     }
                 }
             })
@@ -535,7 +494,7 @@ namespace Atom.Core
                 try
                 {
                     // Bandwidth Control for incoming data.
-                    BandwidthCounter bandwidthCounter = new BandwidthCounter();
+                    AtomBandwidth bandwidthCounter = new AtomBandwidth();
                     // The endpoint used store the address of the remote host.
                     // I made a wrapper for this because a lot of garbage will be created if we use the IPEndPoint directly.
                     // Note that: the client must send something to the server first(establish a connection), otherwise, the directly send from the server to the client will fail, this is called a "Handshake".
@@ -549,8 +508,7 @@ namespace Atom.Core
                     byte[] buffer = new byte[1536];
                     // A memory block to store the received data.
                     // Prevent a new allocation every time we receive data and the copy of the data.
-                    Memory<byte> memoryBuffer = buffer;
-                    // Start receiving data.
+                    ReadOnlySpan<byte> _buffer = buffer;
                     while (!_cancelTokenSource.IsCancellationRequested)
                     {
                         bandwidthCounter.Start();
@@ -559,100 +517,61 @@ namespace Atom.Core
                         {
                             bandwidthCounter.Stop();
                             bandwidthCounter.Add(bytesTransferred);
-                            bandwidthCounter.Get();
-                            using (NeutronStream dataStream = Neutron.PooledNetworkStreams.Pull())
+                            bandwidthCounter.Get(out int bytesRate, out int messageRate);
+                            using (AtomStream atomStream = new())
                             {
-                                var writer = dataStream.Writer;
-                                var reader = dataStream.Reader;
-                                reader.SetBuffer(memoryBuffer[..bytesTransferred].Span);
-                                // Get the header of Custom Protocol and create the MultiEndPoint
-                                // MultiEndPoint is a tuple that contains the address of the remote host, the port and the channel.
-                                // MultiEndPoint is used to separate the channels, each player has their own channel separating their data and properties.
-                                ChannelMode channel = (ChannelMode)reader.ReadByte();
-                                TargetMode targetMode = (TargetMode)reader.ReadByte();
-                                OperationMode opMode = (OperationMode)reader.ReadByte();
-                                ushort playerId = reader.ReadUShort();
-                                // If the channel is reliable, let's read the sequence number.
-                                if (channel == ChannelMode.Reliable || channel == ChannelMode.ReliableSequenced)
+                                atomStream.SetBuffer(_buffer[..bytesTransferred]);
+                                atomStream.Read(out byte channelByte);
+                                atomStream.Read(out byte targetByte);
+                                atomStream.Read(out byte opByte);
+                                atomStream.Read(out ushort playerId);
+
+                                Channel channelMode = (Channel)channelByte;
+                                Target targetMode = (Target)targetByte;
+                                Operation opMode = (Operation)opByte;
+                                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
                                 {
-                                    (ushort, byte) chKey = (playerId, (byte)channel);
-                                    // The acknowledgement is the first 4 bytes of the packet.
-                                    // Let's send it to the remote host to confirm that we received the packet.
-                                    int seqAck = reader.ReadInt();
-                                    // If the packet was confirmed, let's remove it from the list of packets to re-transmit.
-                                    // After that, let's send the data to the remote host.
-                                    if (opMode == OperationMode.Acknowledgement)
+                                    (ushort, byte) chKey = (playerId, (byte)channelMode);
+                                    atomStream.Read(out int seqAck);
+                                    if (opMode == Operation.Acknowledgement)
                                     {
                                         if (!IsServer)
-                                        {
-                                            ChannelsData[chKey].PacketsToReTransmit.Remove((seqAck, playerId), out _);
-                                            //ChannelsData[chKey].PacketsToReTransmit.Remove(seqAck, out _);
-                                            // LogHelper.Error($"Removing packet -> {seqAck} : {playerId} : {channel}");
-                                            // if (!ChannelsData[chKey].PacketsToReTransmit.Remove((seqAck, playerId), out _))
-                                            //     LogHelper.Error($"The packet with sequence number {seqAck} was not found in the list of packets to re-transmit -> {(ChannelsData[chKey].PacketsToReTransmit.ContainsKey((seqAck, playerId))).ToString()}");
-                                            // else
-                                            //     LogHelper.Error($"The packet with sequence number {seqAck} was removed from the list of packets to re-transmit.");
-                                        }
+                                            ChannelsData[chKey].MessagesToRelay.TryRemove((seqAck, playerId), out _);
                                         else
                                         {
-                                            // Find the original peer of packet
-                                            SocketClient peer = ClientsByEndPoint.Values.Where(x => x.Id == playerId).First();
-                                            // Find the other peer when sent the Ack.
-                                            SocketClient otherPeer = ClientsByEndPoint[_peerEndPoint];
-                                            bool isOtherPeer = !peer.EndPoint.Equals(otherPeer.EndPoint);
-                                            if (isOtherPeer)
-                                            {
-                                                LogHelper.Error("Not Original Client");
-                                                if (!ChannelsData[chKey].PacketsToReTransmit.Remove((seqAck, otherPeer.Id), out _))
-                                                    LogHelper.Error("Error to Removal");
-                                            }
-                                            else
-                                            {
-                                                ChannelsData[chKey].PacketsToReTransmit.Remove((seqAck, playerId), out _);
-                                                LogHelper.Error("Original Client");
-                                            }
+                                            AtomClient peer = ClientsById[playerId];
+                                            AtomClient otherPeer = ClientsByEndPoint[_peerEndPoint];
+                                            bool isOtherPeer = !peer.EndPoint.Equals(_peerEndPoint);
+                                            ushort peerId = isOtherPeer ? otherPeer.Id : playerId;
+                                            ChannelsData[chKey].MessagesToRelay.TryRemove((seqAck, peerId), out _);
                                         }
                                     }
                                     else
                                     {
                                         // Send the acknowledgement to the remote host to confirm that we received the packet.
-                                        // If the Ack is dropped, the remote host will resend the packet.
-                                        Send(NeutronStream.Empty, channel, TargetMode.Single, OperationMode.Acknowledgement, playerId, _peerEndPoint, seqAck);
-                                        // LogHelper.Error($"The ack with sequence number {seqAck} was sent to the remote host.");
-                                        // Read the left data in the packet.
-                                        // All the data sent by the remote host is stored in the buffer.
-                                        byte[] data = reader.ReadNext();
-                                        // Let's process the data and send it to the remote host again.
-                                        if (channel == ChannelMode.Reliable)
+                                        Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
+                                        byte[] data = atomStream.ReadNext();
+                                        if (channelMode == Channel.Reliable)
                                         {
                                             // Let's to check if the packet is a duplicate.
                                             // If the packet is a duplicate, let's ignore it.
-                                            // It's necessary to check if the packet is a duplicate, because the Ack can be lost, and the packet will be re-transmitted.
-                                            if (!ChannelsData[chKey].ReceivedSequences.TryAdd(seqAck, seqAck))
+                                            if (!ChannelsData[chKey].Acknowledgements.TryAdd(seqAck, seqAck))
                                                 continue;
-                                            // Let's send the data to the remote host.
-                                            // Don't send the data to the remote host if the packet is a duplicate.
-                                            // Don't send the data is opMode is Acknowledgement or Data.
-                                            using (NeutronStream stream = Neutron.PooledNetworkStreams.Pull())
+
+                                            using (AtomStream reliableStream = new())
                                             {
-                                                var sReader = stream.Reader;
-                                                sReader.SetBuffer(data);
-                                                OnMessageCompleted?.Invoke(stream, playerId, _peerEndPoint, channel, targetMode, opMode, this);
+                                                reliableStream.SetBuffer(data);
+                                                OnMessageCompleted(reliableStream, playerId, _peerEndPoint, channelMode, targetMode, opMode);
                                             }
                                         }
-                                        else if (channel == ChannelMode.ReliableSequenced)
+                                        else if (channelMode == Channel.ReliableAndOrderly)
                                         {
-                                            // Let's to check if the packet is a duplicate.
-                                            // If the packet is a duplicate, let's ignore it.
-                                            // It's necessary to check if the packet is a duplicate, because the Ack can be lost, and the packet will be re-transmitted.
-                                            // As the data is sequenced, the verification is easy.
-                                            // Ex: If the last processed packet is 100, this means that all data between 0 and 100 was received and processed, sequencing assures us of this.
-                                            // Then we can safely ignore and remove packets from 0 to 100.
                                             if (seqAck <= ChannelsData[chKey].LastProcessedSequentialAck)
                                                 continue;
-                                            // Let's sequence the data and process when the sequence is correct and then remove it.
-                                            if (ChannelsData[chKey].SequentialData.TryAdd(seqAck, data))
+
+                                            if (ChannelsData[chKey].SequentialData.ContainsKey(seqAck))
                                             {
+                                                ChannelsData[chKey].SequentialData.Add(seqAck, data);
                                                 if (ChannelsData[chKey].IsSequential())
                                                 {
                                                     var KvPSenquentialData = ChannelsData[chKey].SequentialData.ToList();
@@ -662,15 +581,11 @@ namespace Atom.Core
                                                         if (KvP.Key > ChannelsData[chKey].LastProcessedSequentialAck)
                                                         {
                                                             // Let's process the data and send it to the remote host again.
-                                                            using (NeutronStream stream = Neutron.PooledNetworkStreams.Pull())
+                                                            using (AtomStream realibleAndOrdelyStream = new())
                                                             {
-                                                                var sReader = stream.Reader;
-                                                                sReader.SetBuffer(KvP.Value);
-                                                                OnMessageCompleted?.Invoke(stream, playerId, _peerEndPoint, channel, targetMode, opMode, this);
+                                                                realibleAndOrdelyStream.SetBuffer(KvP.Value);
+                                                                OnMessageCompleted(realibleAndOrdelyStream, playerId, _peerEndPoint, channelMode, targetMode, opMode);
                                                             }
-                                                            // Increment the last processed sequence.
-                                                            // Indicates the last processed packet, used to discard the packets that were already processed.
-                                                            // Any value lesser than this value means that the packet was already processed.
                                                             ChannelsData[chKey].LastProcessedSequentialAck++;
                                                         }
                                                         else
@@ -684,36 +599,34 @@ namespace Atom.Core
                                         }
                                     }
                                 }
-                                else if (channel == ChannelMode.Unreliable)
+                                else if (channelMode == Channel.Unreliable)
                                 {
                                     // Read the left data in the packet.
                                     // All the data sent by the remote host is stored in the buffer.
-                                    byte[] data = reader.ReadNext();
+                                    byte[] data = atomStream.ReadNext();
                                     // Let's process the data and send it to the remote host again.
-                                    using (NeutronStream stream = Neutron.PooledNetworkStreams.Pull())
+                                    using (AtomStream unreliableStream = new())
                                     {
-                                        var sReader = stream.Reader;
-                                        sReader.SetBuffer(data);
-                                        OnMessageCompleted?.Invoke(stream, playerId, _peerEndPoint, channel, targetMode, opMode, this);
+                                        unreliableStream.SetBuffer(data);
+                                        OnMessageCompleted(unreliableStream, playerId, _peerEndPoint, channelMode, targetMode, opMode);
                                     }
                                 }
                             }
                         }
                         else
-                            LogHelper.Error("\r\nReceiveFrom() failed with error code: " + bytesTransferred);
+                            Debug.LogError("\r\nReceiveFrom() failed with error code: " + bytesTransferred);
                     }
                 }
                 catch (SocketException ex)
                 {
                     if (ex.ErrorCode == 10004)
                         return;
-
-                    LogHelper.Stacktrace(ex);
+                    Debug.LogException(ex);
                 }
                 catch (ThreadAbortException) { }
                 catch (Exception ex)
                 {
-                    LogHelper.Stacktrace(ex);
+                    Debug.LogException(ex);
                 }
             })
             {
@@ -725,23 +638,14 @@ namespace Atom.Core
 
         private bool GetAvailableId(out ushort id)
         {
+            id = 0;
             if (_ids.Count > 0)
-            {
-                if (!_ids.TryPull(out id))
-                    id = 0;
-            }
-            else
-                id = 0;
-            return id > NeutronConstants.GENERATE_PLAYER_ID;
+                id = _ids.Pull();
+            return id != 0;
         }
 
         private void ReturnId(ushort id) => _ids.Push(id, true);
-
-        public Socket GetSocket()
-        {
-            return _socket;
-        }
-
+        public Socket GetSocket() => _socket;
         public void Close()
         {
             try

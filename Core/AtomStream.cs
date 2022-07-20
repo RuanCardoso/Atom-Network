@@ -21,9 +21,11 @@ namespace Atom.Core
 {
     public class AtomStream : IDisposable
     {
+        public static readonly AtomStream None = new();
         private readonly MemoryStream _memoryStream;
         private readonly byte[] _buffer;
         private readonly byte[] _memoryBuffer;
+        private int _countBytes;
         public long Position { get => _memoryStream.Position; set => _memoryStream.Position = value; }
 
         public AtomStream()
@@ -33,8 +35,12 @@ namespace Atom.Core
             _buffer = new byte[MaxUdpPacketSize];
         }
 
-        public void Write(byte value) =>
+        public void Write(byte value)
+        {
             _memoryStream.WriteByte(value);
+            _countBytes += 1;
+        }
+
         public void Read(out byte value) =>
             value = (byte)_memoryStream.ReadByte();
         public void Write(int value)
@@ -74,7 +80,7 @@ namespace Atom.Core
 #endif
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
-            _memoryStream.Write(_buffer, 0, count);
+            Write(_buffer, 0, count);
         }
 
         public void Read(out short value)
@@ -103,7 +109,7 @@ namespace Atom.Core
             _buffer[1] = (byte)(TmpValue >> 8);
             _buffer[2] = (byte)(TmpValue >> 16);
             _buffer[3] = (byte)(TmpValue >> 24);
-            _memoryStream.Write(_buffer, 0, count);
+            Write(_buffer, 0, count);
         }
 
         public unsafe void Read(out float value)
@@ -129,7 +135,7 @@ namespace Atom.Core
             _buffer[5] = (byte)(TmpValue >> 40);
             _buffer[6] = (byte)(TmpValue >> 48);
             _buffer[7] = (byte)(TmpValue >> 56);
-            _memoryStream.Write(_buffer, 0, count);
+            Write(_buffer, 0, count);
         }
 
         public unsafe virtual void Read(out double value)
@@ -189,7 +195,7 @@ namespace Atom.Core
             Span<byte> _rentBytes = !inStackAlloc ? rentBytes : stackalloc byte[getByteCount];
             int bytesCount = Encoding.GetBytes(value, _rentBytes);
             Write7BitEncodedInt(bytesCount);
-            _memoryStream.Write(_rentBytes[..bytesCount]);
+            Write(_rentBytes[..bytesCount]);
             if (!inStackAlloc)
                 ArrayPool.Return(rentBytes);
         }
@@ -219,13 +225,21 @@ namespace Atom.Core
             }
         }
 
-        private void Write(byte[] buffer, int offset, int count)
+        public byte[] ReadNext()
+        {
+            int bytesRemaining = (int)(_countBytes - _memoryStream.Position);
+            Read(bytesRemaining);
+            return _buffer[..bytesRemaining];
+        }
+
+        public void Write(byte[] buffer, int offset, int count)
         {
 #if ATOM_DEBUG
             try
             {
 #endif
                 _memoryStream.Write(buffer, offset, count);
+                _countBytes += count;
 #if ATOM_DEBUG
             }
             catch (NotSupportedException ex)
@@ -237,6 +251,45 @@ namespace Atom.Core
                 }
             }
 #endif
+        }
+
+        public void Write(ReadOnlySpan<byte> buffer)
+        {
+#if ATOM_DEBUG
+            try
+            {
+#endif
+                _memoryStream.Write(buffer);
+                _countBytes += buffer.Length;
+#if ATOM_DEBUG
+            }
+            catch (NotSupportedException ex)
+            {
+                switch (ex.Message)
+                {
+                    case "Memory stream is not expandable.":
+                        throw new NotSupportedException("AtomStream: Write: There is not enough space in the buffer to write the data.");
+                }
+            }
+#endif
+        }
+
+        public void SetBuffer(ReadOnlySpan<byte> buffer)
+        {
+            Write(buffer);
+            _memoryStream.Position = 0;
+        }
+
+        public ReadOnlySpan<byte> GetBuffer()
+        {
+            ReadOnlySpan<byte> _buffer = _memoryBuffer;
+            return _buffer[.._countBytes];
+        }
+
+        public byte[] GetBufferAsCopy()
+        {
+            ReadOnlySpan<byte> _buffer = _memoryBuffer;
+            return _buffer[.._countBytes].ToArray();
         }
 
         bool _disposable;
