@@ -39,6 +39,7 @@ namespace Atom.Core.Wrappers
         }
         public bool FixedSize => _fixedSize;
         public int Size => _size;
+        public int CountBytes => _countBytes;
 
         public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
         {
@@ -365,6 +366,7 @@ namespace Atom.Core.Wrappers
                 AtomCore.AtomStreamPool.Push(this);
             }
         }
+
         public static AtomStream Get()
         {
             var atomStream = AtomCore.AtomStreamPool.Pull();

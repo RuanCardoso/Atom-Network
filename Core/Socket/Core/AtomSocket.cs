@@ -372,44 +372,57 @@ namespace Atom.Core
             Send(message, channel, targetMode, Operation.Data, playerId, endPoint, 0);
         }
 
-        private void Send(AtomStream message, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
+        private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
         {
-            var data = message.GetBufferAsReadOnlySpan();
+            var data = messageStream.GetBufferAsReadOnlySpan();
             int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RealibleSize : AtomCore.UnrealibleSize;
 #if ATOM_DEBUG
-            if (message.FixedSize)
+            if (messageStream.FixedSize)
             {
-                if ((data.Length + defSize) != message.Size)
-                    throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + message.Size + " but you need " + (data.Length + defSize) + ".");
+                if ((data.Length + defSize) != messageStream.Size)
+                    throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + messageStream.Size + " but you need " + (data.Length + defSize) + ".");
             }
 #endif
             // data >> header
-            message.Reset(pos: defSize);
-            message.Write(data);
-            message.Seek(0, SeekOrigin.Begin);
+            messageStream.Reset(pos: defSize);
+            messageStream.Write(data);
+            messageStream.Position = 0;
             // header << data
-            message.Write((byte)channelMode);
-            message.Write((byte)targetMode);
-            message.Write((byte)opMode);
-            message.Write(playerId);
+            messageStream.Write((byte)channelMode);
+            messageStream.Write((byte)targetMode);
+            messageStream.Write((byte)opMode);
+            messageStream.Write(playerId);
             // Move the position to the end, message is fully written.
-            message.Seek(0, SeekOrigin.End);
-            if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
+            messageStream.Position = messageStream.CountBytes;
+            using (AtomMessage _message = AtomMessage.Get())
             {
-                (ushort, byte) channelKey = (playerId, (byte)channelMode);
-                AtomChannel channelData = ChannelsData[channelKey];
-                if (seqAck == 0)
-                    seqAck = Interlocked.Increment(ref channelData.SentAck);
-                message.Write(seqAck);
-                byte[] buffer = message.GetBufferAsCopy();
-                AtomMessage _message = new(seqAck, playerId, DateTime.UtcNow, endPoint, opMode, targetMode, channelMode, channelData, buffer);
-                Send(_message);
-            }
-            else if (channelMode == Channel.Unreliable)
-            {
-                byte[] buffer = message.GetBufferAsCopy();
-                Debug.Log(BitConverter.ToString(buffer));
-                AtomMessage _message = new(playerId, endPoint, opMode, targetMode, channelMode, buffer);
+                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
+                {
+                    AtomChannel channelData = ChannelsData[(playerId, (byte)channelMode)];
+                    if (seqAck == 0)
+                        seqAck = Interlocked.Increment(ref channelData.SentAck);
+                    // Write the sequence number in the header!
+                    messageStream.Write(seqAck);
+                    // Write the realible message.
+                    _message.SeqAck = seqAck;
+                    _message.PlayerId = playerId;
+                    _message.LastSent = DateTime.UtcNow;
+                    _message.EndPoint = endPoint;
+                    _message.Operation = opMode;
+                    _message.Target = targetMode;
+                    _message.Channel = channelMode;
+                    _message.AtomChannel = channelData;
+                    _message.Data = messageStream.GetBufferAsCopy();
+                }
+                else if (channelMode == Channel.Unreliable)
+                {
+                    _message.PlayerId = playerId;
+                    _message.EndPoint = endPoint;
+                    _message.Operation = opMode;
+                    _message.Target = targetMode;
+                    _message.Channel = channelMode;
+                    _message.Data = messageStream.GetBufferAsCopy();
+                }
                 Send(_message);
             }
         }
@@ -505,7 +518,7 @@ namespace Atom.Core
                                 atomStream.Read(out byte targetByte);
                                 atomStream.Read(out byte opByte);
                                 atomStream.Read(out ushort playerId);
-
+                                // Parse bytes.....
                                 Channel channelMode = (Channel)channelByte;
                                 Target targetMode = (Target)targetByte;
                                 Operation opMode = (Operation)opByte;

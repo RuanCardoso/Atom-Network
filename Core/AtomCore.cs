@@ -24,6 +24,7 @@ namespace Atom.Core
         public const int RealibleSize = 9;
         public const int UnrealibleSize = 5;
         public static AtomPooling<AtomStream> AtomStreamPool { get; } = new(() => new(true), 10, false, true, "AtomStreamPool");
+        public static AtomPooling<AtomMessage> AtomMessagePool { get; } = new(() => new(), 10, false, true, "AtomMessagePool");
         private void Awake()
         {
             AtomGlobal.LoadSettingsFile();

@@ -22,7 +22,7 @@ namespace Atom.Core.Tests
         {
             //if (Input.GetKeyDown(KeyCode.Return))
             {
-                using (AtomStream data = new())
+                using (AtomStream data = dataP)
                 {
                     data.Write((byte)Message.Test);
                     SendToServer(data, Channel.Unreliable, Target.Single);
