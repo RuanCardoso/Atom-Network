@@ -57,7 +57,7 @@ namespace Atom.Core
                     messageRate = (int)packetsTransferRate;
                     _lastSec = seconds;
                 }
-                if (seconds >= 10)
+                if (seconds >= 5.016)
                 {
                     _lastSec = _totalBytes = _totalMessages = 0;
                     _stopwatch.Reset();

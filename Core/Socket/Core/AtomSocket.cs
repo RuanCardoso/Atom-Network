@@ -13,7 +13,8 @@
     ===========================================================*/
 
 /*===========================================================
-    Atom Socket is a core library for the Atom framework, this was written with extreme performance in mind, zero allocations!
+    Atom Socket is a core library for the Atom framework, this was written with extreme performance in mind. 
+    All classes are designed with zero memory allocations(or as low as possible) for the best performance, We have low-level tier allocations that we have no control over, ex: ReceiveFrom_icall(Mono) and FastAllocateString(Kernel OS)
     UDP Socket based communication is used to communicate with the remote host.
     The UDP protocol has three main parts: the header, the data.
     The header includes the following information: the channel, the target, the operation, and id of the sender.
@@ -511,7 +512,14 @@ namespace Atom.Core
                             bandwidthCounter.Stop();
                             bandwidthCounter.Add(bytesTransferred);
                             bandwidthCounter.Get(out int bytesRate, out int messageRate);
-                            using (AtomStream atomStream = new())
+#if UNITY_SERVER
+                            if (bytesRate > 0 && messageRate > 0)
+                                Console.WriteLine($"Avg: Rec {bytesTransferred} bytes, {bytesRate} bytes/s, {messageRate} messages/s");
+#else
+                            if (bytesRate > 0 && messageRate > 0)
+                                Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, null, "Avg: Rec {0} bytes | {1} bytes/s | {2} messages/s", bytesTransferred, bytesRate, messageRate);
+#endif
+                            using (AtomStream atomStream = AtomStream.Get())
                             {
                                 atomStream.SetBuffer(_buffer[..bytesTransferred]);
                                 atomStream.Read(out byte channelByte);
@@ -541,16 +549,16 @@ namespace Atom.Core
                                     }
                                     else
                                     {
-                                        Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck); //
-                                        byte[] data = atomStream.ReadNext();
+                                        Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
+                                        ReadOnlySpan<byte> data = atomStream.ReadNext();
                                         if (channelMode == Channel.Reliable)
                                         {
                                             if (!ChannelsData[chKey].Acknowledgements.TryAdd(seqAck, seqAck))
                                                 continue;
 
-                                            using (AtomStream reader = new(readOnly: true))
+                                            using (AtomStream reader = AtomStream.Get())
                                             {
-                                                using (AtomStream writer = new(writerOnly: true))
+                                                using (AtomStream writer = AtomStream.Get())
                                                 {
                                                     reader.SetBuffer(data);
                                                     OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
@@ -564,7 +572,7 @@ namespace Atom.Core
 
                                             if (ChannelsData[chKey].SequentialData.ContainsKey(seqAck))
                                             {
-                                                ChannelsData[chKey].SequentialData.Add(seqAck, data);
+                                                ChannelsData[chKey].SequentialData.Add(seqAck, data.ToArray());
                                                 if (ChannelsData[chKey].IsSequential())
                                                 {
                                                     var KvPSenquentialData = ChannelsData[chKey].SequentialData.ToList();
@@ -573,9 +581,9 @@ namespace Atom.Core
                                                         var KvP = KvPSenquentialData[i];
                                                         if (KvP.Key > ChannelsData[chKey].LastProcessedSequentialAck)
                                                         {
-                                                            using (AtomStream reader = new(readOnly: true))
+                                                            using (AtomStream reader = AtomStream.Get())
                                                             {
-                                                                using (AtomStream writer = new(writerOnly: true))
+                                                                using (AtomStream writer = AtomStream.Get())
                                                                 {
                                                                     reader.SetBuffer(KvP.Value);
                                                                     OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
@@ -596,13 +604,10 @@ namespace Atom.Core
                                 }
                                 else if (channelMode == Channel.Unreliable)
                                 {
-                                    // Read the left data in the packet.
-                                    // All the data sent by the remote host is stored in the buffer.
-                                    byte[] data = atomStream.ReadNext();
-                                    // Let's process the data and send it to the remote host again.
-                                    using (AtomStream reader = new(readOnly: true))
+                                    ReadOnlySpan<byte> data = atomStream.ReadNext();
+                                    using (AtomStream reader = AtomStream.Get())
                                     {
-                                        using (AtomStream writer = new(writerOnly: true))
+                                        using (AtomStream writer = AtomStream.Get())
                                         {
                                             reader.SetBuffer(data);
                                             OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);

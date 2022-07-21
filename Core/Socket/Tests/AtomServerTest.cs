@@ -6,10 +6,14 @@ namespace Atom.Core.Tests
 {
     public class AtomServerTest : AtomSocket
     {
-#if UNITY_EDITOR
         private void Awake()
         {
             Initialize(new IPEndPoint(IPAddress.Any, 5055), true);
+        }
+
+        private void Start()
+        {
+
         }
 
         protected override Message OnServerMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
@@ -17,12 +21,11 @@ namespace Atom.Core.Tests
             switch (base.OnServerMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, udp))
             {
                 case Message.Test:
-                    //Debug.Log($"Server message: test");
+                    //Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "Message: {0}", Message.Test);
                     break;
             }
 
             return default;
         }
-#endif
     }
 }

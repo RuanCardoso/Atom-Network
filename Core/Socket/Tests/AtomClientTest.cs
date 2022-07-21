@@ -16,16 +16,18 @@ namespace Atom.Core.Tests
             StartCoroutine(Connect(new IPEndPoint(IPAddress.Loopback, 5055)));
         }
 
-
-        AtomStream dataP = new(AtomCore.UnrealibleSize + sizeof(byte));
+        readonly AtomStream fixedStream = new(AtomCore.UnrealibleSize + sizeof(byte));
         private void Update()
         {
             //if (Input.GetKeyDown(KeyCode.Return))
             {
-                using (AtomStream data = dataP)
+                for (int i = 0; i < 1200; i++)
                 {
-                    data.Write((byte)Message.Test);
-                    SendToServer(data, Channel.Unreliable, Target.Single);
+                    using (AtomStream data = fixedStream)
+                    {
+                        data.Write((byte)Message.Test);
+                        SendToServer(data, Channel.Unreliable, Target.Single);
+                    }
                 }
             }
         }

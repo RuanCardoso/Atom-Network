@@ -98,7 +98,7 @@ namespace Atom.Core
                 ? throw new Exception("AtomMessage: A item has been modified while it was in the pool!")
                 : atomMessage;
 #else
-            return atomStream;
+            return atomMessage;
 #endif
         }
     }

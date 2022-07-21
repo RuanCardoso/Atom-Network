@@ -27,6 +27,7 @@ namespace Atom.Core
         public static AtomPooling<AtomMessage> AtomMessagePool { get; } = new(() => new(), 10, false, true, "AtomMessagePool");
         private void Awake()
         {
+            Application.targetFrameRate = 60;
             AtomGlobal.LoadSettingsFile();
         }
     }

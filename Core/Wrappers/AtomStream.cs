@@ -236,11 +236,12 @@ namespace Atom.Core.Wrappers
             value = Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
         }
 
-        public byte[] ReadNext()
+        public ReadOnlySpan<byte> ReadNext()
         {
+            ReadOnlySpan<byte> _bytes = _buffer;
             int bytesRemaining = (int)(_countBytes - _memoryStream.Position);
             Read(bytesRemaining);
-            return _buffer[..bytesRemaining];
+            return _bytes[..bytesRemaining];
         }
 
         private void Read(int count, int offset = 0)
