@@ -13,7 +13,7 @@
     ===========================================================*/
 
 /*===========================================================
-    Neutron Core is a core library for the Atom framework.
+    Atom Socket is a core library for the Atom framework, this was written with extreme performance in mind, zero allocations!
     UDP Socket based communication is used to communicate with the remote host.
     The UDP protocol has three main parts: the header, the data.
     The header includes the following information: the channel, the target, the operation, and id of the sender.
@@ -42,6 +42,7 @@ using Atom.Core.Wrappers;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -57,8 +58,9 @@ namespace Atom.Core
         {
             internal AtomClient(ushort id, EndPoint endPoint)
             {
+                IPEndPoint ipEndPoint = endPoint as IPEndPoint;
                 Id = id;
-                EndPoint = endPoint;
+                EndPoint = new AtomEndPoint(ipEndPoint.Address, ipEndPoint.Port);
             }
 
             public ushort Id { get; set; }
@@ -74,11 +76,6 @@ namespace Atom.Core
 
         /// <summary> Id of connection, used to identify the connection.</summary>
         private ushort _id = 0;
-        /// <summary>
-        /// The Connected property gets the connection state of the Socket as of the last I/O operation. 
-        /// When it returns false, the Socket was either never connected, or is no longer connected
-        /// </summary>
-        private bool _isConnected;
         /// <summary>
         /// The socket used to receive and send the data, all data are received and sent simultaneously.
         /// Synchronous receive and send operations are used to avoid the overhead of asynchronous operations, 
@@ -99,8 +96,6 @@ namespace Atom.Core
         /// Prevents the CPU from spinning, Thread.Abort() is not recommended, because it's not a good way to stop a thread and not work on Linux OS.
         /// </summary>
         private CancellationTokenSource _cancelTokenSource;
-        /// <summary> Used to enqueue the received data, the data is enqueued in a queue, and the queue is processed in a thread.</summary>
-        private BlockingCollection<AtomMessage> _dataToSend;
         /// <summary>The list to store the connected clients. </summary>
         private readonly ConcurrentDictionary<EndPoint, AtomClient> ClientsByEndPoint = new();
         private readonly ConcurrentDictionary<ushort, AtomClient> ClientsById = new();
@@ -118,7 +113,7 @@ namespace Atom.Core
         /// <summary>
         /// Returns whether the "Instance" is the Server or the Client.
         /// </summary>
-        public bool IsServer => !_isConnected;
+        public bool IsServer { get; private set; }
 
 #pragma warning disable IDE1006 // Estilos de Nomenclatura
         private void __Constructor__(EndPoint endPoint)
@@ -135,7 +130,6 @@ namespace Atom.Core
             };
             _socket.Bind(endPoint);
             _cancelTokenSource = new();
-            _dataToSend = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
             for (ushort i = 1; i < ushort.MaxValue; i++)
@@ -143,8 +137,10 @@ namespace Atom.Core
             _ids.Sort();
         }
 
-        protected void Initialize(EndPoint endPoint)
+        protected void Initialize(EndPoint endPoint, bool isServer)
         {
+            IsServer = isServer;
+            // Initialize the constructor!
             __Constructor__(endPoint);
             // Start the receive thread.
             // The Unity API doesn't allow to be called from a thread other than the main thread.
@@ -152,20 +148,15 @@ namespace Atom.Core
             // Why don't receive the data in the main thread?
             // Because the ReceiveFrom() method is blocking, FPS will be affected.
             // The Unity will be frozen until the data is received, but's not a good idead, right?
-            InitRecThread();
-            // Start the send thread.
-            // This thread is used to send data to the remote host.
-            // Why don't we send the data directly from the receive thread or Unity's main thread?
-            // Because the send method is blocking, and we don't want to block Unity's main thread, FPS will be affected.
-            // Let's the data to a queue, and the queue is processed in a thread.
-            InitSentThread();
+            Receive();
         }
 
         protected IEnumerator Connect(EndPoint endPoint)
         {
+            IPEndPoint ipEndPoint = endPoint as IPEndPoint;
+            _destEndPoint = new AtomEndPoint(ipEndPoint.Address, ipEndPoint.Port);
             while (true)
             {
-                _destEndPoint = endPoint;
                 using (AtomStream message = new())
                 {
                     message.Write((byte)Message.ConnectAndPing);
@@ -175,7 +166,7 @@ namespace Atom.Core
                     // As we are using an unrealible channel, we need to send connection packets until we get a response.
                     SendToServer(message, Channel.Unreliable, Target.Single);
                 }
-                yield return new WaitForSeconds(0.2f);
+                yield return new WaitForSeconds(10f);
             }
         }
 
@@ -218,17 +209,17 @@ namespace Atom.Core
             //}
         }
 
-        private void OnMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
+        private void OnMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
         {
             if (IsServer)
-                OnServerMessageCompleted(stream, playerId, endPoint, channelMode, targetMode, opMode, this);
+                OnServerMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, this);
             else
-                OnClientMessageCompleted(stream, playerId, endPoint, channelMode, targetMode, opMode, this);
+                OnClientMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, this);
         }
 
-        protected virtual Message OnServerMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
+        protected virtual Message OnServerMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
         {
-            stream.Read(out byte value);
+            reader.Read(out byte value);
             Message message = (Message)value;
             switch (message)
             {
@@ -260,9 +251,9 @@ namespace Atom.Core
                                     if (ClientsById.TryAdd(id, client))
                                     {
                                         AddChannel(id);
-                                        stream.Write((byte)Message.ConnectAndPing);
-                                        stream.Write(id);
-                                        udp.SendToClient(stream, channelMode, targetMode, opMode, playerId, endPoint);
+                                        writer.Write((byte)Message.ConnectAndPing);
+                                        writer.Write(id);
+                                        udp.SendToClient(writer, channelMode, targetMode, opMode, playerId, endPoint);
                                     }
                                     else
                                         Debug.LogError("Client not added!");
@@ -276,8 +267,8 @@ namespace Atom.Core
                         else
                         {
                             Relay(playerId);
-                            stream.Write((byte)Message.ConnectAndPing);
-                            udp.SendToClient(stream, channelMode, targetMode, opMode, playerId, endPoint);
+                            writer.Write((byte)Message.ConnectAndPing);
+                            udp.SendToClient(writer, channelMode, targetMode, opMode, playerId, endPoint);
                         }
                     }
                     break;
@@ -287,19 +278,18 @@ namespace Atom.Core
             return default;
         }
 
-        protected virtual Message OnClientMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
+        protected virtual Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
         {
-            stream.Read(out byte value);
+            reader.Read(out byte value);
             Message message = (Message)value;
             switch (message)
             {
                 case Message.ConnectAndPing:
                     if (_id == 0)
                     {
-                        _id.Read(stream);
+                        _id.Read(reader);
                         for (ushort i = 0; i < ushort.MaxValue; i++)
                             AddChannel(i);
-                        _isConnected = true;
                     }
                     else
                         Relay(playerId);  // Let's relay the packets to the server.
@@ -362,141 +352,129 @@ namespace Atom.Core
             //{ /*Prevent duplicate RTS Packet*/ }
         }
 
-        private void Enqueue(AtomMessage udpPacket)
-        {
-            // Enqueue data to send.
-            // This operation is thread safe, it's necessary to lock the queue? Yes, because data can be enqueued from different threads,
-            // example: Unity's main thread and the receive thread.
-            _dataToSend.Add(udpPacket);
-        }
-
-        protected void SendToClient(AtomStream dataStream, Channel channel, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint)
+        protected void SendToClient(AtomStream message, Channel channel, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint)
         {
             if (opMode == Operation.Sequence)
-                SendToClient(dataStream, channel, targetMode, playerId, endPoint);
+                SendToClient(message, channel, targetMode, playerId, endPoint);
         }
 
-        protected void SendToServer(AtomStream dataStream, Channel channel, Target targetMode)
+        protected void SendToServer(AtomStream message, Channel channel, Target targetMode)
         {
 #if ATOM_DEBUG
             if (((channel == Channel.ReliableAndOrderly || channel == Channel.Reliable) && _id == 0) || _destEndPoint == null)
                 throw new Exception("[Atom] -> You must connect to the server before sending data.");
 #endif
-            Send(dataStream, channel, targetMode, Operation.Sequence, _id, _destEndPoint, 0);
+            Send(message, channel, targetMode, Operation.Sequence, _id, _destEndPoint, 0);
         }
 
-        private void SendToClient(AtomStream dataStream, Channel channel, Target targetMode, ushort playerId, EndPoint endPoint)
+        private void SendToClient(AtomStream message, Channel channel, Target targetMode, ushort playerId, EndPoint endPoint)
         {
-            Send(dataStream, channel, targetMode, Operation.Data, playerId, endPoint, 0);
+            Send(message, channel, targetMode, Operation.Data, playerId, endPoint, 0);
         }
 
-        private void Send(AtomStream dataStream, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
+        private void Send(AtomStream message, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
         {
-            var data = dataStream.GetBuffer();
-            using (AtomStream packet = new())
+            var data = message.GetBufferAsReadOnlySpan();
+            int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RealibleSize : AtomCore.UnrealibleSize;
+#if ATOM_DEBUG
+            if (message.FixedSize)
             {
-                packet.Write((byte)channelMode);
-                packet.Write((byte)targetMode);
-                packet.Write((byte)opMode);
-                packet.Write(playerId);
-                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
-                {
-                    (ushort, byte) channelKey = (playerId, (byte)channelMode);
-                    AtomChannel channelData = ChannelsData[channelKey];
-                    if (seqAck == 0)
-                        seqAck = Interlocked.Increment(ref channelData.SentAck);
-                    packet.Write(seqAck);
-                    packet.Write(data);
-                    byte[] buffer = packet.GetBufferAsCopy();
-                    AtomMessage udpPacket = new(seqAck, playerId, DateTime.UtcNow, endPoint, opMode, targetMode, channelMode, channelData, buffer);
-                    Enqueue(udpPacket);
-                }
-                else if (channelMode == Channel.Unreliable)
-                {
-                    packet.Write(data);
-                    AtomMessage udpPacket = new(playerId, endPoint, opMode, targetMode, channelMode, packet.GetBufferAsCopy());
-                    Enqueue(udpPacket);
-                }
+                if ((data.Length + defSize) != message.Size)
+                    throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + message.Size + " but you need " + (data.Length + defSize) + ".");
+            }
+#endif
+            // data >> header
+            message.Reset(pos: defSize);
+            message.Write(data);
+            message.Seek(0, SeekOrigin.Begin);
+            // header << data
+            message.Write((byte)channelMode);
+            message.Write((byte)targetMode);
+            message.Write((byte)opMode);
+            message.Write(playerId);
+            // Move the position to the end, message is fully written.
+            message.Seek(0, SeekOrigin.End);
+            if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
+            {
+                (ushort, byte) channelKey = (playerId, (byte)channelMode);
+                AtomChannel channelData = ChannelsData[channelKey];
+                if (seqAck == 0)
+                    seqAck = Interlocked.Increment(ref channelData.SentAck);
+                message.Write(seqAck);
+                byte[] buffer = message.GetBufferAsCopy();
+                AtomMessage _message = new(seqAck, playerId, DateTime.UtcNow, endPoint, opMode, targetMode, channelMode, channelData, buffer);
+                Send(_message);
+            }
+            else if (channelMode == Channel.Unreliable)
+            {
+                byte[] buffer = message.GetBufferAsCopy();
+                Debug.Log(BitConverter.ToString(buffer));
+                AtomMessage _message = new(playerId, endPoint, opMode, targetMode, channelMode, buffer);
+                Send(_message);
             }
         }
 
-        private void InitSentThread()
+        private void Send(AtomMessage message)
         {
-            new Thread(() =>
+            if (IsServer)
             {
-                // Let' send the data in a loop.
-                while (!_cancelTokenSource.IsCancellationRequested)
+                //! "CreateTransmissionPacket(udpPacket)" must be called before _socket.SendTo(udpPacket.Data, udpPacket.EndPoint), otherwise the packet will be lost.
+                //! Sometimes the Ack will arrive before the transmission packet is created, and the packet will be lost, so we need to create the transmission packet before sending the packet.
+                //! "isConnected" is false, is server, so we need to send the data to the client or clients.
+                switch (message.Target)
                 {
-                    // Le't get the data from the queue and send it.
-                    // This collection is blocked until the data is available, prevents de CPU from spinning.
-                    AtomMessage message = _dataToSend.Take();
-                    if (IsServer)
-                    {
-                        //! "CreateTransmissionPacket(udpPacket)" must be called before _socket.SendTo(udpPacket.Data, udpPacket.EndPoint), otherwise the packet will be lost.
-                        //! Sometimes the Ack will arrive before the transmission packet is created, and the packet will be lost, so we need to create the transmission packet before sending the packet.
-                        //! "isConnected" is false, is server, so we need to send the data to the client or clients.
-                        switch (message.Target)
-                        {
-                            case Target.All:
-                                Relay(message, message.EndPoint, message.PlayerId);
-                                _socket.SendTo(message.Data, message.EndPoint);
-                                foreach (var KvP in ClientsByEndPoint.ToList())
-                                {
-                                    if (!KvP.Key.Equals(message.EndPoint))
-                                    {
-                                        AtomClient socketClient = KvP.Value;
-                                        Relay(message, socketClient.EndPoint, socketClient.Id);
-                                        _socket.SendTo(message.Data, socketClient.EndPoint);
-                                    }
-                                    else
-                                        continue;
-                                }
-                                break;
-                            case Target.Others:
-                                // // If the packet is sent to others, it's necessary to send it to all the clients except the sender.
-                                // // The sender is the owner of the packet, so we don't need to send it to the sender.
-                                // foreach (var KvP in ClientsByEndPoint.ToList())
-                                // {
-                                //     if (!KvP.Key.Equals(udpPacket.EndPoint))
-                                //     {
-                                //         SocketClient socketClient = KvP.Value;
-                                //         ChannelData channeldata = ChannelsData[(socketClient.Id, (byte)udpPacket.ChannelMode)];
-                                //         CreateTransmissionPacket(udpPacket, channeldata, socketClient.EndPoint);
-                                //         _socket.SendTo(udpPacket.Data, KvP.Key);
-                                //     }
-                                //     else
-                                //         continue;
-                                // }
-                                break;
-                            case Target.Single:
-                                Relay(message, message.EndPoint, message.PlayerId);
-                                _socket.SendTo(message.Data, message.EndPoint);
-                                break;
-                        }
-                    }
-                    else // "isConnected" is true, is client, so we need to send the data to the server.
-                    {
+                    case Target.All:
                         Relay(message, message.EndPoint, message.PlayerId);
-                        // Send the packet to the remote host.
                         _socket.SendTo(message.Data, message.EndPoint);
-                    }
+                        foreach (var KvP in ClientsByEndPoint.ToList())
+                        {
+                            if (!KvP.Key.Equals(message.EndPoint))
+                            {
+                                AtomClient socketClient = KvP.Value;
+                                Relay(message, socketClient.EndPoint, socketClient.Id);
+                                _socket.SendTo(message.Data, socketClient.EndPoint);
+                            }
+                            else
+                                continue;
+                        }
+                        break;
+                    case Target.Others:
+                        // // If the packet is sent to others, it's necessary to send it to all the clients except the sender.
+                        // // The sender is the owner of the packet, so we don't need to send it to the sender.
+                        // foreach (var KvP in ClientsByEndPoint.ToList())
+                        // {
+                        //     if (!KvP.Key.Equals(udpPacket.EndPoint))
+                        //     {
+                        //         SocketClient socketClient = KvP.Value;
+                        //         ChannelData channeldata = ChannelsData[(socketClient.Id, (byte)udpPacket.ChannelMode)];
+                        //         CreateTransmissionPacket(udpPacket, channeldata, socketClient.EndPoint);
+                        //         _socket.SendTo(udpPacket.Data, KvP.Key);
+                        //     }
+                        //     else
+                        //         continue;
+                        // }
+                        break;
+                    case Target.Single:
+                        Relay(message, message.EndPoint, message.PlayerId);
+                        _socket.SendTo(message.Data, message.EndPoint);
+                        break;
                 }
-            })
+            }
+            else
             {
-                Name = "Neutron_SentThread",
-                Priority = ThreadPriority.Normal,
-                IsBackground = true,
-            }.Start();
+                Relay(message, message.EndPoint, message.PlayerId);
+                _socket.SendTo(message.Data, message.EndPoint);
+            }
         }
 
-        private void InitRecThread()
+        private void Receive()
         {
             new Thread(() =>
             {
                 try
                 {
                     // Bandwidth Control for incoming data.
-                    AtomBandwidth bandwidthCounter = new AtomBandwidth();
+                    AtomBandwidth bandwidthCounter = new();
                     // The endpoint used store the address of the remote host.
                     // I made a wrapper for this because a lot of garbage will be created if we use the IPEndPoint directly.
                     // Note that: the client must send something to the server first(establish a connection), otherwise, the directly send from the server to the client will fail, this is called a "Handshake".
@@ -504,7 +482,7 @@ namespace Atom.Core
                     // Let's get the address and port of the client and send to the others clients, others clients will send to this address and port, this iw how P2P works.
                     // Remember that we need the server to keep sending packets to the client(Keep Alive) and vice versa, otherwise, the connection will be lost.
                     // This technique is known as "UDP Hole Punching".
-                    EndPoint _peerEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                    EndPoint _peerEndPoint = new AtomEndPoint(IPAddress.Any, 0);
                     // Create a buffer to receive the data.
                     // The size of the buffer is the maximum size of the data that can be received(MTU Size).
                     byte[] buffer = new byte[1536];
@@ -550,17 +528,20 @@ namespace Atom.Core
                                     }
                                     else
                                     {
-                                        Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
+                                        Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck); //
                                         byte[] data = atomStream.ReadNext();
                                         if (channelMode == Channel.Reliable)
                                         {
                                             if (!ChannelsData[chKey].Acknowledgements.TryAdd(seqAck, seqAck))
                                                 continue;
 
-                                            using (AtomStream reliableStream = new())
+                                            using (AtomStream reader = new(readOnly: true))
                                             {
-                                                reliableStream.SetBuffer(data);
-                                                OnMessageCompleted(reliableStream, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                using (AtomStream writer = new(writerOnly: true))
+                                                {
+                                                    reader.SetBuffer(data);
+                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                }
                                             }
                                         }
                                         else if (channelMode == Channel.ReliableAndOrderly)
@@ -579,10 +560,13 @@ namespace Atom.Core
                                                         var KvP = KvPSenquentialData[i];
                                                         if (KvP.Key > ChannelsData[chKey].LastProcessedSequentialAck)
                                                         {
-                                                            using (AtomStream realibleAndOrdelyStream = new())
+                                                            using (AtomStream reader = new(readOnly: true))
                                                             {
-                                                                realibleAndOrdelyStream.SetBuffer(KvP.Value);
-                                                                OnMessageCompleted(realibleAndOrdelyStream, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                                using (AtomStream writer = new(writerOnly: true))
+                                                                {
+                                                                    reader.SetBuffer(KvP.Value);
+                                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                                }
                                                             }
                                                             ChannelsData[chKey].LastProcessedSequentialAck++;
                                                         }
@@ -603,10 +587,13 @@ namespace Atom.Core
                                     // All the data sent by the remote host is stored in the buffer.
                                     byte[] data = atomStream.ReadNext();
                                     // Let's process the data and send it to the remote host again.
-                                    using (AtomStream unreliableStream = new())
+                                    using (AtomStream reader = new(readOnly: true))
                                     {
-                                        unreliableStream.SetBuffer(data);
-                                        OnMessageCompleted(unreliableStream, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                        using (AtomStream writer = new(writerOnly: true))
+                                        {
+                                            reader.SetBuffer(data);
+                                            OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                        }
                                     }
                                 }
                             }
@@ -628,7 +615,7 @@ namespace Atom.Core
                 }
             })
             {
-                Name = "Neutron_RecvThread",
+                Name = "Atom_RecvThread",
                 Priority = ThreadPriority.Highest,
                 IsBackground = true,
             }.Start();

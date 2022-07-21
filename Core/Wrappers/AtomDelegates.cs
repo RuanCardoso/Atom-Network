@@ -13,7 +13,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
-namespace Atom.Core
+namespace Atom.Core.Wrappers
 {
     public delegate TResult AtomFunc<out TResult>();
     public delegate TResult AtomFunc<in T1, out TResult>(T1 arg1);

@@ -17,6 +17,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Wrappers;
 using System;
 using System.Net;
 
@@ -27,19 +28,19 @@ namespace Atom.Core
         /// <summary>Sequence number used to identify the message.</summary>
         public int SeqAck { get; }
         /// <summary>Id of the endpoint responsible for the message.</summary>
-        public ushort PlayerId { get; set; }
+        public ushort PlayerId { get; }
         /// <summary>The endpoint responsible for the message.</summary>
-        public EndPoint EndPoint { get; set; }
+        public EndPoint EndPoint { get; }
         /// <summary>The Channel used to send the message.</summary>
         public AtomChannel AtomChannel { get; }
         /// <summary>The data that will be sent with the message.</summary>
         public byte[] Data { get; }
         /// <summary> Defines whether it is a relay message.</summary>
-        public bool IsRelay { get; set; }
+        public bool IsRelay { get; }
         /// <summary>Last timestamp the packet was sent.</summary>
-        public DateTime LastSent { get; set; }
+        public DateTime LastSent { get; }
         public Operation Operation { get; }
-        public Target Target { get; set; }
+        public Target Target { get; }
         public Channel Channel { get; }
         /// <summary>Number of attempts the message was resent.</summary>
         public int Attempts = 0;

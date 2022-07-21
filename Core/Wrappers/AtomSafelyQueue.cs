@@ -82,13 +82,16 @@ namespace Atom.Core.Wrappers
         {
             if (_sort)
             {
-                var values = _queue.ToList();
-                values.Sort();
-                if (values.Count > 0)
+                lock (_lock)
                 {
-                    _queue.Clear();
-                    foreach (var value in values)
-                        _queue.Enqueue(value);
+                    var values = _queue.ToList();
+                    values.Sort();
+                    if (values.Count > 0)
+                    {
+                        _queue.Clear();
+                        foreach (var value in values)
+                            _queue.Enqueue(value);
+                    }
                 }
             }
         }

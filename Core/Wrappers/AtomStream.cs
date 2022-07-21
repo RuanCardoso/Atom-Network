@@ -15,24 +15,51 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using static Atom.Core.AtomGlobal;
 
-namespace Atom.Core
+namespace Atom.Core.Wrappers
 {
     public class AtomStream : IDisposable
     {
+        private int _countBytes;
         public static readonly AtomStream None = new();
         private readonly MemoryStream _memoryStream;
         private readonly byte[] _buffer;
         private readonly byte[] _memoryBuffer;
-        private int _countBytes;
-        public long Position { get => _memoryStream.Position; set => _memoryStream.Position = value; }
-
-        public AtomStream()
+        private readonly bool _reuse;
+        private readonly int _size;
+        private readonly bool _fixedSize;
+        private readonly bool _readOnly;
+        private readonly bool _writerOnly;
+        public long Position
         {
-            _memoryBuffer = new byte[MaxUdpPacketSize];
-            _memoryStream = new(_memoryBuffer, 0, MaxUdpPacketSize);
-            _buffer = new byte[MaxUdpPacketSize];
+            get => _memoryStream.Position;
+            set => _memoryStream.Position = value;
+        }
+        public bool FixedSize => _fixedSize;
+        public int Size => _size;
+
+        public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
+        {
+            _fixedSize = false;
+            _size = MaxUdpPacketSize;
+            _memoryBuffer = new byte[_size];
+            _memoryStream = new(_memoryBuffer, 0, _size);
+            _buffer = new byte[_size];
+            _reuse = reuse;
+            _readOnly = readOnly;
+            _writerOnly = writerOnly;
+        }
+
+        public AtomStream(int size) // Zero allocations with size!
+        {
+            _fixedSize = true;
+            _size = size;
+            _memoryBuffer = new byte[_size];
+            _memoryStream = new(_memoryBuffer, 0, _size);
+            _buffer = new byte[_size];
+            _reuse = false;
         }
 
         public void Write(byte value)
@@ -47,8 +74,8 @@ namespace Atom.Core
         {
             int count = sizeof(int);
 #if ATOM_DEBUG
-            if (MaxUdpPacketSize < count)
-                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write int!");
+            if (_size < count)
+                throw new Exception($"_size is less than {count}, can't write int!");
 #endif
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
@@ -75,8 +102,8 @@ namespace Atom.Core
         {
             int count = sizeof(short);
 #if ATOM_DEBUG
-            if (MaxUdpPacketSize < count)
-                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write short!");
+            if (_size < count)
+                throw new Exception($"_size is less than {count}, can't write short!");
 #endif
             _buffer[0] = (byte)value;
             _buffer[1] = (byte)(value >> 8);
@@ -101,8 +128,8 @@ namespace Atom.Core
         {
             int count = sizeof(float);
 #if ATOM_DEBUG
-            if (MaxUdpPacketSize < count)
-                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write float!");
+            if (_size < count)
+                throw new Exception($"_size is less than {count}, can't write float!");
 #endif
             uint TmpValue = *(uint*)&value;
             _buffer[0] = (byte)TmpValue;
@@ -123,8 +150,8 @@ namespace Atom.Core
         {
             int count = sizeof(double);
 #if ATOM_DEBUG
-            if (MaxUdpPacketSize < count)
-                throw new Exception($"MaxUdpPacketSize is less than {count}, can't write double!");
+            if (_size < count)
+                throw new Exception($"_size is less than {count}, can't write double!");
 #endif
             ulong TmpValue = *(ulong*)&value;
             _buffer[0] = (byte)TmpValue;
@@ -188,8 +215,8 @@ namespace Atom.Core
         public void Write(string value, bool inStackAlloc = false)
         {
             int getByteCount = Encoding.GetByteCount(value);
-            if (MaxUdpPacketSize < getByteCount)
-                throw new Exception($"MaxUdpPacketSize is less than {getByteCount}, can't write string!");
+            if (_size < getByteCount)
+                throw new Exception($"_size is less than {getByteCount}, can't write string!");
 
             byte[] rentBytes = !inStackAlloc ? ArrayPool.Rent(getByteCount) : null;
             Span<byte> _rentBytes = !inStackAlloc ? rentBytes : stackalloc byte[getByteCount];
@@ -208,11 +235,20 @@ namespace Atom.Core
             value = Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
         }
 
+        public byte[] ReadNext()
+        {
+            int bytesRemaining = (int)(_countBytes - _memoryStream.Position);
+            Read(bytesRemaining);
+            return _buffer[..bytesRemaining];
+        }
+
         private void Read(int count, int offset = 0)
         {
 #if ATOM_DEBUG
-            if (count + offset > MaxUdpPacketSize)
-                throw new Exception($"MaxUdpPacketSize is less than {count + offset}, can't read!");
+            if (_writerOnly)
+                throw new Exception("Can't read from a writer only stream!");
+            if (count + offset > _size)
+                throw new Exception($"_size is less than {count + offset}, can't read!");
 #endif
             while (offset < count)
             {
@@ -225,15 +261,12 @@ namespace Atom.Core
             }
         }
 
-        public byte[] ReadNext()
-        {
-            int bytesRemaining = (int)(_countBytes - _memoryStream.Position);
-            Read(bytesRemaining);
-            return _buffer[..bytesRemaining];
-        }
-
         public void Write(byte[] buffer, int offset, int count)
         {
+#if ATOM_DEBUG
+            if (_readOnly)
+                throw new Exception("AtomStream: Write: Stream is read only!");
+#endif
 #if ATOM_DEBUG
             try
             {
@@ -280,7 +313,7 @@ namespace Atom.Core
             _memoryStream.Position = 0;
         }
 
-        public ReadOnlySpan<byte> GetBuffer()
+        public ReadOnlySpan<byte> GetBufferAsReadOnlySpan()
         {
             ReadOnlySpan<byte> _buffer = _memoryBuffer;
             return _buffer[.._countBytes];
@@ -288,20 +321,60 @@ namespace Atom.Core
 
         public byte[] GetBufferAsCopy()
         {
-            ReadOnlySpan<byte> _buffer = _memoryBuffer;
-            return _buffer[.._countBytes].ToArray();
+            if (!_fixedSize) // GC Alloc Here
+            {
+                ReadOnlySpan<byte> _buffer = _memoryBuffer;
+                return _buffer[.._countBytes].ToArray();
+            }
+            else
+                return _memoryBuffer;
+        }
+
+        public void Reset(int pos = 0, int countBytes = 0)
+        {
+            _memoryStream.Position = pos;
+            _countBytes = countBytes;
+        }
+
+        public void Seek(long offset, SeekOrigin seekOrigin)
+        {
+            _memoryStream.Seek(offset, seekOrigin);
         }
 
         bool _disposable;
         public void Dispose()
         {
-            if (!_disposable)
+            if (!_reuse)
             {
-                _memoryStream.Dispose();
-                _disposable = true;
+                if (!_fixedSize)
+                {
+                    if (!_disposable)
+                    {
+                        _memoryStream.Dispose();
+                        _disposable = true;
+                    }
+                    else
+                        throw new Exception("AtomStream: Dispose: Already disposed!");
+                }
+                else
+                    Reset();
             }
             else
-                throw new Exception("AtomStream: Dispose: Already disposed!");
+            {
+                Reset();
+                AtomCore.AtomStreamPool.Push(this);
+            }
+        }
+        public static AtomStream Get()
+        {
+            var atomStream = AtomCore.AtomStreamPool.Pull();
+#if ATOM_DEBUG
+            return atomStream._countBytes != 0
+                ? throw new Exception("AtomStream: A item has been modified while it was in the pool!")
+                : atomStream;
+#else
+            return atomStream;
+#endif
         }
     }
 }

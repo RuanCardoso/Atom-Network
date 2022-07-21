@@ -1,3 +1,4 @@
+using Atom.Core.Wrappers;
 using System.Net;
 using UnityEngine;
 
@@ -7,7 +8,7 @@ namespace Atom.Core.Tests
     {
         private void Awake()
         {
-            Initialize(new IPEndPoint(IPAddress.Any, 5058));
+            Initialize(new IPEndPoint(IPAddress.Any, Random.Range(5056, 5090)), false);
         }
 
         private void Start()
@@ -15,21 +16,23 @@ namespace Atom.Core.Tests
             StartCoroutine(Connect(new IPEndPoint(IPAddress.Loopback, 5055)));
         }
 
+
+        AtomStream dataP = new(AtomCore.UnrealibleSize + sizeof(byte));
         private void Update()
         {
-            //if (Input.GetKey(KeyCode.Return))
+            //if (Input.GetKeyDown(KeyCode.Return))
             {
                 using (AtomStream data = new())
                 {
-                    //data.Write((byte)Message.Test);
-                    //SendToServer(data, Channel.Unreliable, Target.Single);
+                    data.Write((byte)Message.Test);
+                    SendToServer(data, Channel.Unreliable, Target.Single);
                 }
             }
         }
 
-        protected override Message OnClientMessageCompleted(AtomStream stream, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
+        protected override Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
         {
-            switch (base.OnClientMessageCompleted(stream, playerId, endPoint, channelMode, targetMode, opMode, udp))
+            switch (base.OnClientMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, udp))
             {
                 case Message.Test:
                     Debug.Log($"Client message: test");

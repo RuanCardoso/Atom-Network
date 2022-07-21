@@ -13,6 +13,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Wrappers;
 using UnityEngine;
 
 namespace Atom.Core
@@ -20,6 +21,9 @@ namespace Atom.Core
     [DefaultExecutionOrder(-1)]
     public class AtomCore : MonoBehaviour
     {
+        public const int RealibleSize = 9;
+        public const int UnrealibleSize = 5;
+        public static AtomPooling<AtomStream> AtomStreamPool { get; } = new(() => new(true), 10, false, true, "AtomStreamPool");
         private void Awake()
         {
             AtomGlobal.LoadSettingsFile();

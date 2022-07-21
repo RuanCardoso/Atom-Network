@@ -13,6 +13,8 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Wrappers;
+
 namespace Atom.Core
 {
     public static class AtomExtensions
