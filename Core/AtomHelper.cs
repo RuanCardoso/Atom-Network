@@ -15,6 +15,7 @@
 #if UNITY_2021_3_OR_NEWER
 using MessagePack;
 using MessagePack.Resolvers;
+using System;
 using System.Linq;
 using UnityEditor;
 
@@ -51,6 +52,10 @@ namespace Atom.Core
                 MessagePackSerializerOptions.Standard.WithResolver(StaticCompositeResolver.Instance);
             return true;
         }
+
+        public static string ToBin(int value) => $"Bin: {Convert.ToString(value, 2).PadLeft(8, '0')}";
+        public static string ToHex(int value) => $"0x{value:X} | {value}";
+        public static int TwoThePowerOfN(int bits) => (int)Math.Pow(2, bits) - 1;
     }
 }
 #endif

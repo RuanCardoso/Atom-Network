@@ -21,11 +21,17 @@ namespace Atom.Core.Tests
             switch (base.OnServerMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, udp))
             {
                 case Message.Test:
-                    //Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "Message: {0}", Message.Test);
+                    Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "Message: {0}", Message.Test);
                     break;
             }
 
             return default;
+        }
+
+        private void OnApplicationQuit()
+        {
+            Close();
+            Debug.Log("Server stopped!");
         }
     }
 }

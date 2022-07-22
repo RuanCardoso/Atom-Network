@@ -16,17 +16,17 @@ namespace Atom.Core.Tests
             StartCoroutine(Connect(new IPEndPoint(IPAddress.Loopback, 5055)));
         }
 
-        readonly AtomStream fixedStream = new(AtomCore.UnrealibleSize + sizeof(byte));
+        readonly AtomStream fixedStream = new(AtomCore.RealibleSize + sizeof(byte));
         private void Update()
         {
-            //if (Input.GetKeyDown(KeyCode.Return))
+            if (Input.GetKeyDown(KeyCode.Return))
             {
-                for (int i = 0; i < 1200; i++)
+                for (int i = 0; i < 10; i++)
                 {
                     using (AtomStream data = fixedStream)
                     {
                         data.Write((byte)Message.Test);
-                        SendToServer(data, Channel.Unreliable, Target.Single);
+                        SendToServer(data, Channel.Reliable, Target.Single);
                     }
                 }
             }
@@ -42,6 +42,12 @@ namespace Atom.Core.Tests
             }
 
             return default;
+        }
+
+        private void OnApplicationQuit()
+        {
+            Close();
+            Debug.Log("Client stopped!");
         }
     }
 }

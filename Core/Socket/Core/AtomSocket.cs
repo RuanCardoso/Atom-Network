@@ -43,7 +43,6 @@ using Atom.Core.Wrappers;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -98,8 +97,8 @@ namespace Atom.Core
         /// </summary>
         private CancellationTokenSource _cancelTokenSource;
         /// <summary>The list to store the connected clients. </summary>
-        private readonly ConcurrentDictionary<EndPoint, AtomClient> ClientsByEndPoint = new();
-        private readonly ConcurrentDictionary<ushort, AtomClient> ClientsById = new();
+        private readonly ConcurrentDictionary<EndPoint, AtomClient> _clientsByEndPoint = new();
+        private readonly ConcurrentDictionary<ushort, AtomClient> _clientsById = new();
         /// <summary>
         /// Store the information of the channels.
         /// Ex: SentSequence, RecvSequence, Acknowledge....etc
@@ -108,25 +107,21 @@ namespace Atom.Core
         /// The acknowledgment number is used to confirm that the packet has been received, if not, the packet is resent.
         /// The sequence number is used to reorder packets, if the packet is out of order, the packet is reordered.
         /// </summary>
-        private readonly ConcurrentDictionary<(ushort, byte), AtomChannel> ChannelsData = new();
+        private readonly ConcurrentDictionary<(ushort, byte), AtomChannel> _channels = new();
         /// <summary>List of exlusive id's, used to prevent the same id to be used twice.</summary>
         private readonly AtomSafelyQueue<ushort> _ids = new(true);
-        /// <summary>
-        /// Returns whether the "Instance" is the Server or the Client.
-        /// </summary>
+        /// <summary> Returns whether the "Instance" is the Server or the Client. </summary>
         public bool IsServer { get; private set; }
 
-#pragma warning disable IDE1006 // Estilos de Nomenclatura
+#pragma warning disable IDE1006
         private void __Constructor__(EndPoint endPoint)
-#pragma warning restore IDE1006 // Estilos de Nomenclatura
+#pragma warning restore IDE1006
         {
             _socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
             {
                 // The ReceiveBufferSize property gets or sets the number of bytes that you are expecting to store in the receive buffer for each read operation. 
-                // This property actually manipulates the network buffer space allocated for receiving incoming data.
                 ReceiveBufferSize = AtomGlobal.MaxRecBuffer,
                 // The SendBufferSize property gets or sets the number of bytes that you are expecting to store in the send buffer for each send operation.
-                // This property actually manipulates the network buffer space allocated for sending outgoing data.
                 SendBufferSize = AtomGlobal.MaxSendBuffer,
             };
             _socket.Bind(endPoint);
@@ -171,45 +166,6 @@ namespace Atom.Core
             }
         }
 
-        private void Relay(ushort playerId)
-        {
-            //for (int iCM = 0; iCM < _channelModes.Length; iCM++)
-            //{
-            //    Channel channelMode = _channelModes[iCM];
-            //    if (ChannelsData.TryGetValue((playerId, (byte)channelMode), out AtomChannel channelData))
-            //    {
-            //        var packetsToRelay = channelData.MessagesToRelay.ToList();
-            //        for (int i = 0; i < packetsToRelay.Count; i++)
-            //        {
-            //            var packetToRelay = packetsToRelay[i];
-            //            AtomRelayMessage transmissionPacket = packetToRelay.Value;
-            //            // Calc the last time we sent the packet.
-            //            TimeSpan currentTime = DateTime.UtcNow.Subtract(transmissionPacket.LastSent);
-            //            // If the time elapsed is greater than X second, the packet is re-sent if the packet is not acknowledged.
-            //            if (currentTime.TotalSeconds >= /*ping time +*/ 0d) // formula: ping time + relay time, ping time is automatically compensated and added as the check is done on every ping packet.
-            //            {
-            //                Debug.LogError($"[Neutron] -> Re-try to send packet {packetToRelay.Key} -> : {transmissionPacket.SeqAck.ToString()} -> {packetToRelay.Value.Data.ChannelMode}");
-
-            //                // if (!pKvP.Value.PacketsToReTransmit.ContainsKey(transmissionPacket.SeqAck))
-            //                //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} not found.");
-            //                // else
-            //                //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} found.");
-
-            //                (int, ushort) PTTKey = (transmissionPacket.SeqAck, transmissionPacket.Data.PlayerId);
-            //                if (transmissionPacket.IsDisconnected())
-            //                    channelData.PacketsToReTransmit.Remove(PTTKey, out _);
-            //                else
-            //                    Enqueue(transmissionPacket.Data);
-            //                // Set the last time to current time when the packet is sent.
-            //                transmissionPacket.LastSent = DateTime.UtcNow;
-            //            }
-            //        }
-            //    }
-            //    else
-            //        LogHelper.Error($"ChannelData not found for playerId: {playerId} and channelMode: {channelMode}");
-            //}
-        }
-
         private void OnMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
         {
             if (IsServer)
@@ -228,36 +184,21 @@ namespace Atom.Core
                     {
                         if (playerId == 0)
                         {
-                            if (ClientsByEndPoint.ContainsKey(endPoint))
+                            if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _))
                             {
-                                if (ClientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient))
-                                {
-                                    if (ClientsById.TryRemove(socketClient.Id, out _))
-                                    {
-                                        RemoveChannel(socketClient.Id);
-                                        ReturnId(socketClient.Id);
-                                    }
-                                    else
-                                        Debug.LogError($"Client {socketClient.Id} not found in ClientsById.");
-                                }
-                                else
-                                    Debug.LogError($"Failed to remove client {socketClient.Id} from the list.");
+                                RemoveChannel(socketClient.Id);
+                                ReturnId(socketClient.Id);
                             }
 
                             if (GetAvailableId(out ushort id))
                             {
                                 AtomClient client = new(id, endPoint);
-                                if (ClientsByEndPoint.TryAdd(endPoint, client))
+                                if (_clientsByEndPoint.TryAdd(endPoint, client) && _clientsById.TryAdd(id, client))
                                 {
-                                    if (ClientsById.TryAdd(id, client))
-                                    {
-                                        AddChannel(id);
-                                        writer.Write((byte)Message.ConnectAndPing);
-                                        writer.Write(id);
-                                        udp.SendToClient(writer, channelMode, targetMode, opMode, playerId, endPoint);
-                                    }
-                                    else
-                                        Debug.LogError("Client not added!");
+                                    AddChannel(id);
+                                    writer.Write((byte)Message.ConnectAndPing);
+                                    writer.Write(id);
+                                    udp.SendToClient(writer, channelMode, targetMode, opMode, playerId, endPoint);
                                 }
                                 else
                                     Debug.LogError("Client not added!");
@@ -307,7 +248,7 @@ namespace Atom.Core
             for (int i = 0; i < _channelModes.Length; i++)
             {
                 Channel channelMode = _channelModes[i];
-                if (!ChannelsData.TryAdd((playerId, (byte)channelMode), new AtomChannel()))
+                if (!_channels.TryAdd((playerId, (byte)channelMode), new AtomChannel()))
                     Debug.LogError($"Channel {channelMode} already exists!");
             }
         }
@@ -317,9 +258,48 @@ namespace Atom.Core
             for (int i = 0; i < _channelModes.Length; i++)
             {
                 Channel channelMode = _channelModes[i];
-                if (!ChannelsData.TryRemove((playerId, (byte)channelMode), out _))
+                if (!_channels.TryRemove((playerId, (byte)channelMode), out _))
                     Debug.LogError($"Channel {channelMode} not found!");
             }
+        }
+
+        private void Relay(ushort playerId)
+        {
+            //for (int iCM = 0; iCM < _channelModes.Length; iCM++)
+            //{
+            //    Channel channelMode = _channelModes[iCM];
+            //    if (ChannelsData.TryGetValue((playerId, (byte)channelMode), out AtomChannel channelData))
+            //    {
+            //        var packetsToRelay = channelData.MessagesToRelay.ToList();
+            //        for (int i = 0; i < packetsToRelay.Count; i++)
+            //        {
+            //            var packetToRelay = packetsToRelay[i];
+            //            AtomRelayMessage transmissionPacket = packetToRelay.Value;
+            //            // Calc the last time we sent the packet.
+            //            TimeSpan currentTime = DateTime.UtcNow.Subtract(transmissionPacket.LastSent);
+            //            // If the time elapsed is greater than X second, the packet is re-sent if the packet is not acknowledged.
+            //            if (currentTime.TotalSeconds >= /*ping time +*/ 0d) // formula: ping time + relay time, ping time is automatically compensated and added as the check is done on every ping packet.
+            //            {
+            //                Debug.LogError($"[Neutron] -> Re-try to send packet {packetToRelay.Key} -> : {transmissionPacket.SeqAck.ToString()} -> {packetToRelay.Value.Data.ChannelMode}");
+
+            //                // if (!pKvP.Value.PacketsToReTransmit.ContainsKey(transmissionPacket.SeqAck))
+            //                //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} not found.");
+            //                // else
+            //                //     LogHelper.Error($"Re-transmit packet {pKvP.Key} : {transmissionPacket.SeqAck} found.");
+
+            //                (int, ushort) PTTKey = (transmissionPacket.SeqAck, transmissionPacket.Data.PlayerId);
+            //                if (transmissionPacket.IsDisconnected())
+            //                    channelData.PacketsToReTransmit.Remove(PTTKey, out _);
+            //                else
+            //                    Enqueue(transmissionPacket.Data);
+            //                // Set the last time to current time when the packet is sent.
+            //                transmissionPacket.LastSent = DateTime.UtcNow;
+            //            }
+            //        }
+            //    }
+            //    else
+            //        LogHelper.Error($"ChannelData not found for playerId: {playerId} and channelMode: {channelMode}");
+            //}
         }
 
         private void Relay(AtomMessage udpPacket, EndPoint endPoint, ushort playerId)
@@ -384,45 +364,52 @@ namespace Atom.Core
                     throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + messageStream.Size + " but you need " + (data.Length + defSize) + ".");
             }
 #endif
-            // data >> header
             messageStream.Reset(pos: defSize);
+            Debug.Log(data.Length);
             messageStream.Write(data);
             messageStream.Position = 0;
-            // header << data
-            messageStream.Write((byte)channelMode);
-            messageStream.Write((byte)targetMode);
-            messageStream.Write((byte)opMode);
+#if ATOM_DEBUG
+            if (((byte)channelMode) > AtomCore.ChannelMask || ((byte)targetMode) > AtomCore.TargetMask || ((byte)opMode) > AtomCore.OperationMask)
+                throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
+#endif
+            byte header = (byte)((byte)channelMode | (byte)targetMode << 2 | (byte)opMode << 5);
+            messageStream.Write(header);
             messageStream.Write(playerId);
-            // Move the position to the end, message is fully written.
-            messageStream.Position = messageStream.CountBytes;
             using (AtomMessage _message = AtomMessage.Get())
             {
-                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
+                switch (channelMode)
                 {
-                    AtomChannel channelData = ChannelsData[(playerId, (byte)channelMode)];
-                    if (seqAck == 0)
-                        seqAck = Interlocked.Increment(ref channelData.SentAck);
-                    // Write the sequence number in the header!
-                    messageStream.Write(seqAck);
-                    // Write the realible message.
-                    _message.SeqAck = seqAck;
-                    _message.PlayerId = playerId;
-                    _message.LastSent = DateTime.UtcNow;
-                    _message.EndPoint = endPoint;
-                    _message.Operation = opMode;
-                    _message.Target = targetMode;
-                    _message.Channel = channelMode;
-                    _message.AtomChannel = channelData;
-                    _message.Data = messageStream.GetBufferAsCopy();
-                }
-                else if (channelMode == Channel.Unreliable)
-                {
-                    _message.PlayerId = playerId;
-                    _message.EndPoint = endPoint;
-                    _message.Operation = opMode;
-                    _message.Target = targetMode;
-                    _message.Channel = channelMode;
-                    _message.Data = messageStream.GetBufferAsCopy();
+                    case Channel.Reliable:
+                    case Channel.ReliableAndOrderly:
+                        {
+                            AtomChannel channelData = _channels[(playerId, (byte)channelMode)];
+                            if (seqAck == 0)
+                                seqAck = Interlocked.Increment(ref channelData.SentAck);
+                            // Write the sequence number in the header!
+                            messageStream.Write(seqAck);
+                            //messageStream.Position = messageStream.CountBytes;
+                            // Write the realible message.
+                            _message.SeqAck = seqAck;
+                            _message.PlayerId = playerId;
+                            _message.LastSent = DateTime.UtcNow;
+                            _message.EndPoint = endPoint;
+                            _message.Operation = opMode;
+                            _message.Target = targetMode;
+                            _message.Channel = channelMode;
+                            _message.AtomChannel = channelData;
+                            _message.Data = messageStream.GetBufferAsCopy();
+                            break;
+                        }
+
+                    case Channel.Unreliable:
+                        //messageStream.Position = messageStream.CountBytes;
+                        _message.PlayerId = playerId;
+                        _message.EndPoint = endPoint;
+                        _message.Operation = opMode;
+                        _message.Target = targetMode;
+                        _message.Channel = channelMode;
+                        _message.Data = messageStream.GetBufferAsCopy();
+                        break;
                 }
                 Send(_message);
             }
@@ -440,7 +427,7 @@ namespace Atom.Core
                     case Target.All:
                         Relay(message, message.EndPoint, message.PlayerId);
                         _socket.SendTo(message.Data, message.EndPoint);
-                        foreach (var KvP in ClientsByEndPoint.ToList())
+                        foreach (var KvP in _clientsByEndPoint.ToList())
                         {
                             if (!KvP.Key.Equals(message.EndPoint))
                             {
@@ -507,6 +494,7 @@ namespace Atom.Core
                     {
                         bandwidthCounter.Start();
                         int bytesTransferred = _socket.ReceiveFrom(buffer, ref _peerEndPoint);
+                        Debug.Log(Thread.CurrentThread.ManagedThreadId);
                         if (bytesTransferred >= 0)
                         {
                             bandwidthCounter.Stop();
@@ -522,97 +510,122 @@ namespace Atom.Core
                             using (AtomStream atomStream = AtomStream.Get())
                             {
                                 atomStream.SetBuffer(_buffer[..bytesTransferred]);
-                                atomStream.Read(out byte channelByte);
-                                atomStream.Read(out byte targetByte);
-                                atomStream.Read(out byte opByte);
+                                atomStream.Read(out byte header);
                                 atomStream.Read(out ushort playerId);
-                                // Parse bytes.....
-                                Channel channelMode = (Channel)channelByte;
-                                Target targetMode = (Target)targetByte;
-                                Operation opMode = (Operation)opByte;
-                                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
+                                // Decode the header.
+                                Channel channelMode = (Channel)(byte)(header & AtomCore.ChannelMask);
+                                Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TargetMask);
+                                Operation opMode = (Operation)(byte)((header >> 5) & AtomCore.OperationMask);
+#if ATOM_DEBUG
+                                if (((byte)channelMode) > AtomCore.ChannelMask || ((byte)targetMode) > AtomCore.TargetMask || ((byte)opMode) > AtomCore.OperationMask)
+                                    throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
+#endif
+                                switch (channelMode)
                                 {
-                                    (ushort, byte) chKey = (playerId, (byte)channelMode);
-                                    atomStream.Read(out int seqAck);
-                                    if (opMode == Operation.Acknowledgement)
-                                    {
-                                        if (!IsServer)
-                                            ChannelsData[chKey].MessagesToRelay.TryRemove((seqAck, playerId), out _);
-                                        else
+                                    case Channel.Reliable:
+                                    case Channel.ReliableAndOrderly:
                                         {
-                                            AtomClient peer = ClientsById[playerId];
-                                            AtomClient otherPeer = ClientsByEndPoint[_peerEndPoint];
-                                            bool isOtherPeer = !peer.EndPoint.Equals(_peerEndPoint);
-                                            ushort peerId = isOtherPeer ? otherPeer.Id : playerId;
-                                            ChannelsData[chKey].MessagesToRelay.TryRemove((seqAck, peerId), out _);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
-                                        ReadOnlySpan<byte> data = atomStream.ReadNext();
-                                        if (channelMode == Channel.Reliable)
-                                        {
-                                            if (!ChannelsData[chKey].Acknowledgements.TryAdd(seqAck, seqAck))
-                                                continue;
-
-                                            using (AtomStream reader = AtomStream.Get())
+                                            (ushort, byte) chKey = (playerId, (byte)channelMode);
+                                            atomStream.Read(out int seqAck);
+                                            if (opMode == Operation.Acknowledgement)
                                             {
-                                                using (AtomStream writer = AtomStream.Get())
+                                                if (!IsServer)
+                                                    _channels[chKey].MessagesToRelay.TryRemove((seqAck, playerId), out _);
+                                                else
                                                 {
-                                                    reader.SetBuffer(data);
-                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                    AtomClient peer = _clientsById[playerId];
+                                                    AtomClient otherPeer = _clientsByEndPoint[_peerEndPoint];
+                                                    bool isOtherPeer = !peer.EndPoint.Equals(_peerEndPoint);
+                                                    ushort peerId = isOtherPeer ? otherPeer.Id : playerId;
+                                                    _channels[chKey].MessagesToRelay.TryRemove((seqAck, peerId), out _);
                                                 }
                                             }
-                                        }
-                                        else if (channelMode == Channel.ReliableAndOrderly)
-                                        {
-                                            if (seqAck <= ChannelsData[chKey].LastProcessedSequentialAck)
-                                                continue;
-
-                                            if (ChannelsData[chKey].SequentialData.ContainsKey(seqAck))
+                                            else
                                             {
-                                                ChannelsData[chKey].SequentialData.Add(seqAck, data.ToArray());
-                                                if (ChannelsData[chKey].IsSequential())
+                                                ReadOnlySpan<byte> data = atomStream.ReadNext();
+                                                using (AtomStream ackStream = AtomStream.Get())
                                                 {
-                                                    var KvPSenquentialData = ChannelsData[chKey].SequentialData.ToList();
-                                                    for (int i = 0; i < KvPSenquentialData.Count; i++)
-                                                    {
-                                                        var KvP = KvPSenquentialData[i];
-                                                        if (KvP.Key > ChannelsData[chKey].LastProcessedSequentialAck)
+                                                    Send(AtomStream.None, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
+                                                }
+
+                                                switch (channelMode)
+                                                {
+                                                    case Channel.Reliable:
                                                         {
+                                                            if (!_channels[chKey].Acknowledgements.TryAdd(seqAck, seqAck))
+                                                                continue;
+
                                                             using (AtomStream reader = AtomStream.Get())
                                                             {
                                                                 using (AtomStream writer = AtomStream.Get())
                                                                 {
-                                                                    reader.SetBuffer(KvP.Value);
+                                                                    reader.SetBuffer(data);
+                                                                    Debug.LogError(data.Length);
                                                                     OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
                                                                 }
                                                             }
-                                                            ChannelsData[chKey].LastProcessedSequentialAck++;
+
+                                                            break;
                                                         }
-                                                        else
-                                                            ChannelsData[chKey].SequentialData.Remove(KvP.Key);
-                                                    }
-                                                    ChannelsData[chKey].LastReceivedSequentialAck = KvPSenquentialData.Last().Key;
+
+                                                    case Channel.ReliableAndOrderly:
+                                                        {
+                                                            if (seqAck <= _channels[chKey].LastProcessedSequentialAck)
+                                                                continue;
+
+                                                            if (_channels[chKey].SequentialData.ContainsKey(seqAck))
+                                                            {
+                                                                _channels[chKey].SequentialData.Add(seqAck, data.ToArray());
+                                                                if (_channels[chKey].IsSequential())
+                                                                {
+                                                                    var KvPSenquentialData = _channels[chKey].SequentialData.ToList();
+                                                                    for (int i = 0; i < KvPSenquentialData.Count; i++)
+                                                                    {
+                                                                        var KvP = KvPSenquentialData[i];
+                                                                        if (KvP.Key > _channels[chKey].LastProcessedSequentialAck)
+                                                                        {
+                                                                            using (AtomStream reader = AtomStream.Get())
+                                                                            {
+                                                                                using (AtomStream writer = AtomStream.Get())
+                                                                                {
+                                                                                    reader.SetBuffer(KvP.Value);
+                                                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                                                }
+                                                                            }
+                                                                            _channels[chKey].LastProcessedSequentialAck++;
+                                                                        }
+                                                                        else
+                                                                            _channels[chKey].SequentialData.Remove(KvP.Key);
+                                                                    }
+                                                                    _channels[chKey].LastReceivedSequentialAck = KvPSenquentialData.Last().Key;
+                                                                }
+                                                                else {/*Waiting for more packets, to create the sequence*/}
+                                                            }
+                                                            else {/*Discard duplicate packet....*/}
+
+                                                            break;
+                                                        }
                                                 }
-                                                else {/*Waiting for more packets, to create the sequence*/}
                                             }
-                                            else {/*Discard duplicate packet....*/}
+
+                                            break;
                                         }
-                                    }
-                                }
-                                else if (channelMode == Channel.Unreliable)
-                                {
-                                    ReadOnlySpan<byte> data = atomStream.ReadNext();
-                                    using (AtomStream reader = AtomStream.Get())
-                                    {
-                                        using (AtomStream writer = AtomStream.Get())
+
+                                    case Channel.Unreliable:
                                         {
-                                            reader.SetBuffer(data);
-                                            OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                            ReadOnlySpan<byte> data = atomStream.ReadNext();
+                                            using (AtomStream reader = AtomStream.Get())
+                                            {
+                                                using (AtomStream writer = AtomStream.Get())
+                                                {
+                                                    Debug.Log(data.Length);
+                                                    reader.SetBuffer(data);
+                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                }
+                                            }
+
+                                            break;
                                         }
-                                    }
                                 }
                             }
                         }

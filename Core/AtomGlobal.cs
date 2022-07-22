@@ -50,7 +50,7 @@ namespace Atom.Core
         public static string DebugMode { get; private set; } = "Debug";
         public static Encoding Encoding { get; private set; } = Encoding.ASCII;
         public static ushort MaxUdpPacketSize { get; private set; } = 256;
-        public static ushort MaxPlayers { get; private set; } = 512;
+        public static ushort MaxPlayers { get; private set; } = 255;
         public static int MaxRecBuffer { get; private set; } = 8192;
         public static int MaxSendBuffer { get; private set; } = 8192;
 
@@ -71,6 +71,9 @@ namespace Atom.Core
                 Debug.LogWarning("Suggestion: Set \"MaxUdpPacketSize\" to 512 or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
                 Debug.LogWarning("Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
             }
+
+            if (MaxPlayers > 12400)
+                throw new System.Exception("Max players reached! -> Only 12400 Players are supported!");
         }
 
         static void CreateSettingsFile()

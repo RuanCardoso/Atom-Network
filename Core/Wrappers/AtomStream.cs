@@ -303,7 +303,7 @@ namespace Atom.Core.Wrappers
                 switch (ex.Message)
                 {
                     case "Memory stream is not expandable.":
-                        throw new NotSupportedException("AtomStream: Write: There is not enough space in the buffer to write the data.");
+                        throw new NotSupportedException($"AtomStream: Write: There is not enough space in the buffer to write the data -> {buffer.Length}");
                 }
             }
 #endif

@@ -21,14 +21,22 @@ namespace Atom.Core
     [DefaultExecutionOrder(-1)]
     public class AtomCore : MonoBehaviour
     {
-        public const int RealibleSize = 9;
-        public const int UnrealibleSize = 5;
+        public const byte ChannelMask = 0x3;
+        public const byte OperationMask = 0x3;
+        public const byte TargetMask = 0x7;
+        public const int RealibleSize = 7;
+        public const int UnrealibleSize = 3;
         public static AtomPooling<AtomStream> AtomStreamPool { get; } = new(() => new(true), 10, false, true, "AtomStreamPool");
         public static AtomPooling<AtomMessage> AtomMessagePool { get; } = new(() => new(), 10, false, true, "AtomMessagePool");
+
         private void Awake()
         {
-            Application.targetFrameRate = 60;
             AtomGlobal.LoadSettingsFile();
+        }
+
+        private void Start()
+        {
+            Application.targetFrameRate = 60;
         }
     }
 }
