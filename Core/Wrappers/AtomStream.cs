@@ -23,7 +23,7 @@ namespace Atom.Core.Wrappers
     public class AtomStream : IDisposable
     {
         private int _countBytes;
-        public static readonly AtomStream None = new();
+        public static readonly AtomStream None = new(0);
         private readonly MemoryStream _memoryStream;
         private readonly byte[] _buffer;
         private readonly byte[] _memoryBuffer;

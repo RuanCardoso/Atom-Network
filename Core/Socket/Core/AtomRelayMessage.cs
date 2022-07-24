@@ -18,17 +18,23 @@
 
 #if UNITY_2021_3_OR_NEWER
 
+using System;
+using System.Net;
+
 namespace Atom.Core
 {
     public class AtomRelayMessage
     {
-        /// <summary>The message to be resent.</summary>
-        public AtomMessage Data { get; }
-
-        public AtomRelayMessage(AtomMessage data)
+        public AtomRelayMessage(ushort id, byte[] data, EndPoint endPoint)
         {
+            Id = id;
             Data = data;
+            EndPoint = endPoint;
         }
+
+        public ushort Id { get; }
+        public byte[] Data { get; }
+        public EndPoint EndPoint { get; }
     }
 }
 #endif

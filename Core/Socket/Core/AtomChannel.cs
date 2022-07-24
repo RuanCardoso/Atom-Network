@@ -35,7 +35,7 @@ namespace Atom.Core
         /// <summary> List of the packets that are waiting to be re-sent.</summary>
         public ConcurrentDictionary<(int, ushort), AtomRelayMessage> MessagesToRelay = new();
         /// <summary>Any sequence is received is added to this list, It's only used to check if the sequence is already received.</summary>
-        public Dictionary<int, int> Acknowledgements = new();
+        public HashSet<int> Acknowledgements = new();
         /// <summary> All messages are added to this list is automatically sorted by sequence number.</summary>
         public SortedDictionary<int, byte[]> SequentialData = new();
         /// <summary> This method is used to check if the all data is in sequence.</summary>

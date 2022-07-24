@@ -25,8 +25,7 @@ namespace Atom.Core.Wrappers
 {
     public class AtomEndPoint : IPEndPoint
     {
-        private SocketAddress _socketAddress;
-
+        SocketAddress _socketAddress;
         public AtomEndPoint(long address, int port) : base(address, port) => _socketAddress = base.Serialize();
         public AtomEndPoint(IPAddress address, int port) : base(address, port) => _socketAddress = base.Serialize();
 
@@ -56,7 +55,7 @@ namespace Atom.Core.Wrappers
             return this;
         }
 
-        private long GetIPAddress()
+        public long GetIPAddress()
         {
             switch (AddressFamily)
             {
@@ -75,7 +74,7 @@ namespace Atom.Core.Wrappers
             }
         }
 
-        private int GetPort()
+        public int GetPort()
         {
             switch (AddressFamily)
             {

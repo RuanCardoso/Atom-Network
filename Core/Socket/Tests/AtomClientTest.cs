@@ -1,19 +1,24 @@
+using Atom.Core.Interface;
 using Atom.Core.Wrappers;
 using System.Net;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace Atom.Core.Tests
 {
-    public class AtomClientTest : AtomSocket
+    public class AtomClientTest : MonoBehaviour, ISocketClient
     {
+        readonly AtomSocket clientSocket = new();
         private void Awake()
         {
-            Initialize(new IPEndPoint(IPAddress.Any, Random.Range(5056, 5090)), false);
+            clientSocket.Initialize(new IPEndPoint(IPAddress.Any, Random.Range(5056, 5090)), false);
         }
 
         private void Start()
         {
-            StartCoroutine(Connect(new IPEndPoint(IPAddress.Loopback, 5055)));
+            StartCoroutine(clientSocket.Connect(new IPEndPoint(IPAddress.Loopback, 5055)));
+
+            clientSocket.OnMessageCompleted += OnClientMessageCompleted;
         }
 
         readonly AtomStream fixedStream = new(AtomCore.RealibleSize + sizeof(byte));
@@ -21,32 +26,30 @@ namespace Atom.Core.Tests
         {
             if (Input.GetKeyDown(KeyCode.Return))
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 100; i++)
                 {
                     using (AtomStream data = fixedStream)
                     {
                         data.Write((byte)Message.Test);
-                        SendToServer(data, Channel.Reliable, Target.Single);
+                        clientSocket.SendToServer(data, Channel.Reliable, Target.All);
                     }
                 }
             }
         }
 
-        protected override Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, AtomSocket udp)
+        public void OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
         {
-            switch (base.OnClientMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, udp))
+            switch (clientSocket.OnClientMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode))
             {
                 case Message.Test:
-                    Debug.Log($"Client message: test");
+                    Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, null, "Message(Client): {0} {1}", "Client", playerId);
                     break;
             }
-
-            return default;
         }
 
         private void OnApplicationQuit()
         {
-            Close();
+            clientSocket.Close();
             Debug.Log("Client stopped!");
         }
     }
