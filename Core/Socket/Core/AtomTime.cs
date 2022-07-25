@@ -22,8 +22,8 @@ namespace Atom.Core
     public static class AtomTime
     {
         private static readonly Stopwatch _stopwatch = new Stopwatch();
-        public static double Rpu = 1d;
-        public static double Spu = 1d;
+        public static double ReceivedMessages = 1d;
+        public static double MessagesSent = 1d;
         private static double _offsetMin = double.MinValue;
         private static double _offsetMax = double.MaxValue;
         private const int Size = 10;
@@ -38,7 +38,7 @@ namespace Atom.Core
         ///* Retorna a quantidade de pacotes que falharam em porcentagem(%).
         /// </summary>
         /// <value></value>
-        public static double PacketLoss => Math.Abs(Math.Round(100d - ((Rpu / Spu) * 100d)));
+        public static double PacketLoss => Math.Abs(Math.Round(100d - ((ReceivedMessages / MessagesSent) * 100d), MidpointRounding.ToEven));
 
         /// <summary>
         ///* Retorna o atraso em milissegundos (ms) que uma solitação de rede leva para chegar ao seu destino.

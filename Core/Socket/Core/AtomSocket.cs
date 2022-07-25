@@ -148,11 +148,17 @@ namespace Atom.Core
             Receive();
         }
 
-        public IEnumerator Connect(string address, int port)
+        public void Connect(string address, int port, MonoBehaviour _this)
+        {
+            _this.StartCoroutine(ConnectAndPing(address, port));
+        }
+
+        private IEnumerator ConnectAndPing(string address, int port)
         {
             _destEndPoint = new AtomEndPoint(IPAddress.Parse(address), port);
             while (true)
             {
+                if (_id != 0) AtomTime.MessagesSent++;
                 using (AtomStream message = AtomStream.Get())
                 {
                     message.Write((byte)Message.ConnectAndPing);
@@ -175,7 +181,6 @@ namespace Atom.Core
             {
                 case Message.ConnectAndPing:
                     {
-                        Debug.Log("Client dd!");
                         if (playerId == 0)
                         {
                             if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _))
@@ -241,10 +246,10 @@ namespace Atom.Core
                     else
                     {
                         Send(playerId);
-                        // The client is already connected, calculate the ping.
                         reader.Read(out double timeOfClient);
                         reader.Read(out double timeOfServer);
                         AtomTime.GetNetworkTime(timeOfClient, timeOfServer);
+                        AtomTime.ReceivedMessages++;
                     }
                     break;
                 default:
@@ -449,13 +454,13 @@ namespace Atom.Core
                             bandwidthCounter.Stop();
                             bandwidthCounter.Add(bytesTransferred);
                             bandwidthCounter.Get(out int bytesRate, out int messageRate);
-#endif
 #if UNITY_SERVER
                             if (bytesRate > 0 && messageRate > 0)
                                 Console.WriteLine($"Avg: Rec {bytesTransferred} bytes, {bytesRate} bytes/s, {messageRate} messages/s");
 #else
                             if (bytesRate > 0 && messageRate > 0)
                                 Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, null, "Avg: Rec {0} bytes | {1} bytes/s | {2} messages/s", bytesTransferred, bytesRate, messageRate);
+#endif
 #endif
                             int playerId = 0;
                             using (AtomStream atomStream = AtomStream.Get())
