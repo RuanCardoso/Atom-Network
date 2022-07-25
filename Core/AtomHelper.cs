@@ -30,8 +30,11 @@ namespace Atom.Core
             BuildTargetGroup targetGroup = BuildPipeline.GetBuildTargetGroup(activeBuildTarget);
             var _defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(targetGroup).Split(';').ToList();
 
-            var _except = except.Split(';').ToList();
-            _defines.RemoveAll(x => _except.Contains(x));
+            if (!string.IsNullOrEmpty(except))
+            {
+                var _except = except.Split(';').ToList();
+                _defines.RemoveAll(x => _except.Contains(x));
+            }
 
             for (int i = 0; i < defines.Length; i++)
             {

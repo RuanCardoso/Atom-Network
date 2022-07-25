@@ -37,9 +37,6 @@ namespace Atom.Core
         private void Start()
         {
             Application.targetFrameRate = 60;
-#if ATOM_DEBUG
-            Debug.LogError("HAMM");
-#endif
         }
     }
 }

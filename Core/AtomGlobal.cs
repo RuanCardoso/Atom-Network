@@ -14,8 +14,8 @@
 
 #if UNITY_2021_3_OR_NEWER
 using MessagePack;
+using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -32,7 +32,7 @@ namespace Atom.Core
         [Key("max_udp_packet_size")]
         public ushort MaxUdpPacketSize = 255;
         [Key("max_players")]
-        public ushort MaxPlayers = 512;
+        public ushort MaxPlayers = 255;
         [Key("max_rec_buffer")]
         public int MaxRecBuffer = 8192;
         [Key("max_send_buffer")]
@@ -62,7 +62,6 @@ namespace Atom.Core
             if (!_AOT_)
             {
                 _AOT_ = AtomHelper.AOT();
-
 #if UNITY_EDITOR
                 CreateFileWatcher(RES_PATH);
                 CreateSettingsFile();
@@ -72,6 +71,7 @@ namespace Atom.Core
             }
         }
 
+#if UNITY_EDITOR
         static void CreateSettingsFile()
         {
             if (!Directory.Exists(RES_PATH)) Directory.CreateDirectory(RES_PATH);
@@ -85,94 +85,88 @@ namespace Atom.Core
             else
                 _init_ = true;
         }
+#endif
 
         public static void LoadSettingsFile()
         {
-            if (_init_)
+            try
             {
-                var asset = Resources.Load<TextAsset>(FILE_NAME);
-                if (asset != null)
+                if (_init_)
                 {
-                    byte[] msgBytes = MessagePackSerializer.ConvertFromJson(asset.text);
-                    Settings = MessagePackSerializer.Deserialize<AtomSettings>(msgBytes);
-                    if (Settings != null)
-                    {
-                        if (Settings.MaxUdpPacketSize < 1) Settings.MaxUdpPacketSize = 1;
-                        if (Settings.MaxUdpPacketSize > MIN_MTU)
-                        {
-                            Debug.LogWarning($"Suggestion: Set \"MaxUdpPacketSize\" to {MIN_MTU} or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
-                            Debug.LogWarning("Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
-                        }
-
-                        if (Settings.MaxPlayers > MAX_PLAYERS)
-                            throw new System.Exception($"Max players reached! -> Only {MAX_PLAYERS} players are supported!");
-#if UNITY_EDITOR
-                        //AtomHelper.SetDefine(Settings.BandwidthCounter, "", "ATOM_BANDWIDTH_COUNTER");
-                        switch (Settings.DebugMode)
-                        {
-                            case "debug":
-                                AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
-                                break;
-                            case "release":
-                                AtomHelper.SetDefine(false, "ATOM_DEBUG", "ATOM_RELEASE");
-                                break;
-                            default:
-                                throw new System.Exception("Atom.Core: Debug mode not found!");
-                        }
+#if !UNITY_EDITOR
+                    var asset = Resources.Load<TextAsset>(FILE_NAME);
+                    string strFile = asset.text;
+#else
+                    var asset = File.ReadAllText(PATH);
+                    string strFile = asset;
 #endif
-                        try
+                    if (asset != null)
+                    {
+                        byte[] msgBytes = MessagePackSerializer.ConvertFromJson(strFile);
+                        Settings = MessagePackSerializer.Deserialize<AtomSettings>(msgBytes);
+                        if (Settings != null)
                         {
-                            Encoding = Encoding.GetEncoding(Settings.Encoding);
+                            if (Settings.MaxUdpPacketSize < 1) Settings.MaxUdpPacketSize = 1;
+                            if (Settings.MaxUdpPacketSize > MIN_MTU)
+                            {
+                                Debug.LogWarning($"Suggestion: Set \"MaxUdpPacketSize\" to {MIN_MTU} or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
+                                Debug.LogWarning("Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
+                            }
+
+                            if (Settings.MaxPlayers > MAX_PLAYERS)
+                                throw new System.Exception($"Max players reached! -> Only {MAX_PLAYERS} players are supported!");
+#if UNITY_EDITOR
+                            AtomHelper.SetDefine(!Settings.BandwidthCounter, "", "ATOM_BANDWIDTH_COUNTER");
+                            switch (Settings.DebugMode.ToLower())
+                            {
+                                case "debug":
+                                    AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
+                                    break;
+                                case "release":
+                                    AtomHelper.SetDefine(false, "ATOM_DEBUG", "ATOM_RELEASE");
+                                    break;
+                                default:
+                                    throw new System.Exception("Atom.Core: Debug mode not found!");
+                            }
+#endif
+                            try
+                            {
+                                Encoding = Encoding.GetEncoding(Settings.Encoding);
+                            }
+                            catch
+                            {
+                                Debug.LogWarning("Atom: Encoding not found! Using default encoding (ASCII).");
+                                Encoding = Encoding.ASCII;
+                            }
                         }
-                        catch
-                        {
-                            Debug.LogWarning("Atom: Encoding not found! Using default encoding (ASCII).");
-                            Encoding = Encoding.ASCII;
-                        }
+                        else
+                            Debug.LogWarning("Atom: Deserialization error! Settings not found!");
                     }
                     else
-                        Debug.LogWarning("Atom: Deserialization error! Settings not found!");
+                        Debug.LogWarning($"Atom: Settings file not loaded! Please, check if the file \"{FILE_NAME}.json\" is in the \"Resources\" folder.");
                 }
-                else
-                    Debug.LogWarning("Atom: Settings file not loaded! Please, check if the file \"atom.json\" is in the \"Resources\" folder.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
             }
         }
 
 #if UNITY_EDITOR
         public static void CreateFileWatcher(string path)
         {
-            // Create a new FileSystemWatcher and set its properties.
             FileSystemWatcher watcher = new()
             {
                 Path = path,
-                /* Watch for changes in LastAccess and LastWrite times, and 
-                   the renaming of files or directories. */
-                NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-               | NotifyFilters.FileName | NotifyFilters.DirectoryName,
-                // Only watch text files.
-                Filter = "*.txt"
+                NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                Filter = $"{FILE_NAME}.json"
             };
 
-            // Add event handlers.
             watcher.Changed += new FileSystemEventHandler(OnChanged);
-            watcher.Created += new FileSystemEventHandler(OnChanged);
-            watcher.Deleted += new FileSystemEventHandler(OnChanged);
-            watcher.Renamed += new RenamedEventHandler(OnRenamed);
-
-            // Begin watching.
             watcher.EnableRaisingEvents = true;
         }
 
-        // Define the event handlers.
-        private static void OnChanged(object source, FileSystemEventArgs e)
-        {
-            Debug.Log($"File: {e.FullPath} {e.ChangeType}");
-        }
-
-        private static void OnRenamed(object source, RenamedEventArgs e)
-        {
-
-        }
+        private static void OnChanged(object source, FileSystemEventArgs e) => UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
 #endif
     }
 }
