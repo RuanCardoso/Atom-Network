@@ -16,7 +16,7 @@
 
 namespace MessagePack.Formatters.Atom.Core
 {
-    public sealed class AtomGlobal_AtomSettingsFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::Atom.Core.AtomGlobal.AtomSettings>
+    public sealed class AtomSettingsFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::Atom.Core.AtomSettings>
     {
         // debug_mode
         private static global::System.ReadOnlySpan<byte> GetSpan_DebugMode() => new byte[1 + 10] { 170, 100, 101, 98, 117, 103, 95, 109, 111, 100, 101 };
@@ -30,8 +30,12 @@ namespace MessagePack.Formatters.Atom.Core
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxRecBuffer() => new byte[1 + 14] { 174, 109, 97, 120, 95, 114, 101, 99, 95, 98, 117, 102, 102, 101, 114 };
         // max_send_buffer
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxSendBuffer() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 101, 110, 100, 95, 98, 117, 102, 102, 101, 114 };
+        // max_stream_pool
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxStreamPool() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 116, 114, 101, 97, 109, 95, 112, 111, 111, 108 };
+        // bandwidth_counter
+        private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthCounter() => new byte[1 + 17] { 177, 98, 97, 110, 100, 119, 105, 100, 116, 104, 95, 99, 111, 117, 110, 116, 101, 114 };
 
-        public void Serialize(ref global::MessagePack.MessagePackWriter writer, global::Atom.Core.AtomGlobal.AtomSettings value, global::MessagePack.MessagePackSerializerOptions options)
+        public void Serialize(ref global::MessagePack.MessagePackWriter writer, global::Atom.Core.AtomSettings value, global::MessagePack.MessagePackSerializerOptions options)
         {
             if (value is null)
             {
@@ -40,7 +44,7 @@ namespace MessagePack.Formatters.Atom.Core
             }
 
             var formatterResolver = options.Resolver;
-            writer.WriteMapHeader(6);
+            writer.WriteMapHeader(8);
             writer.WriteRaw(GetSpan_DebugMode());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.DebugMode, options);
             writer.WriteRaw(GetSpan_Encoding());
@@ -53,9 +57,13 @@ namespace MessagePack.Formatters.Atom.Core
             writer.Write(value.MaxRecBuffer);
             writer.WriteRaw(GetSpan_MaxSendBuffer());
             writer.Write(value.MaxSendBuffer);
+            writer.WriteRaw(GetSpan_MaxStreamPool());
+            writer.Write(value.MaxStreamPool);
+            writer.WriteRaw(GetSpan_BandwidthCounter());
+            writer.Write(value.BandwidthCounter);
         }
 
-        public global::Atom.Core.AtomGlobal.AtomSettings Deserialize(ref global::MessagePack.MessagePackReader reader, global::MessagePack.MessagePackSerializerOptions options)
+        public global::Atom.Core.AtomSettings Deserialize(ref global::MessagePack.MessagePackReader reader, global::MessagePack.MessagePackSerializerOptions options)
         {
             if (reader.TryReadNil())
             {
@@ -65,7 +73,7 @@ namespace MessagePack.Formatters.Atom.Core
             options.Security.DepthStep(ref reader);
             var formatterResolver = options.Resolver;
             var length = reader.ReadMapHeader();
-            var ____result = new global::Atom.Core.AtomGlobal.AtomSettings();
+            var ____result = new global::Atom.Core.AtomSettings();
 
             for (int i = 0; i < length; i++)
             {
@@ -102,9 +110,26 @@ namespace MessagePack.Formatters.Atom.Core
                         ____result.MaxRecBuffer = reader.ReadInt32();
                         continue;
                     case 15:
-                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxSendBuffer().Slice(1))) { goto FAIL; }
+                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                        {
+                            default: goto FAIL;
+                            case 7236833197428334957UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 32199637825053279UL) { goto FAIL; }
 
-                        ____result.MaxSendBuffer = reader.ReadInt32();
+                                ____result.MaxSendBuffer = reader.ReadInt32();
+                                continue;
+
+                            case 7310033184047522157UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 30521821902105953UL) { goto FAIL; }
+
+                                ____result.MaxStreamPool = reader.ReadInt32();
+                                continue;
+
+                        }
+                    case 17:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_BandwidthCounter().Slice(1))) { goto FAIL; }
+
+                        ____result.BandwidthCounter = reader.ReadBoolean();
                         continue;
 
                 }

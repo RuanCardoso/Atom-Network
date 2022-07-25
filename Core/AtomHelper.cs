@@ -40,7 +40,9 @@ namespace Atom.Core
                 else if (remove) _defines.Remove(def);
             }
 
-            PlayerSettings.SetScriptingDefineSymbolsForGroup(targetGroup, string.Join(";", _defines.ToArray()));
+            string _defines_ = string.Join(";", _defines.ToArray());
+            PlayerSettings.SetScriptingDefineSymbolsForGroup(targetGroup, _defines_);
+            PlayerSettings.SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.Server, _defines_);
         }
 #endif
         public static bool AOT()

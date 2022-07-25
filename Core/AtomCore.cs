@@ -21,22 +21,25 @@ namespace Atom.Core
     [DefaultExecutionOrder(-1)]
     public class AtomCore : MonoBehaviour
     {
-        public const byte ChannelMask = 0x3;
-        public const byte OperationMask = 0x3;
-        public const byte TargetMask = 0x7;
-        public const int RealibleSize = 7;
-        public const int UnrealibleSize = 3;
-        public static AtomPooling<AtomStream> AtomStreamPool { get; } = new(() => new(true, false, false), 10, false, true, "AtomStreamPool");
-        public static AtomPooling<AtomMessage> AtomMessagePool { get; } = new(() => new(), 10, false, true, "AtomMessagePool");
+        public const byte CHANNEL_MASK = 0x3;
+        public const byte OPERATION_MASK = 0x3;
+        public const byte TARGET_MASK = 0x7;
+        public const int RELIABLE_SIZE = 7;
+        public const int UNRELIABLE_SIZE = 3;
+        public static AtomPooling<AtomStream> StreamPool { get; private set; }
 
         private void Awake()
         {
             AtomGlobal.LoadSettingsFile();
+            StreamPool = new(() => new(true, false, false), AtomGlobal.Settings.MaxStreamPool, false, true, "AtomStreamPool");
         }
 
         private void Start()
         {
             Application.targetFrameRate = 60;
+#if ATOM_DEBUG
+            Debug.LogError("HAMM");
+#endif
         }
     }
 }

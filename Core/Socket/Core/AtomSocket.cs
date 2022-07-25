@@ -121,24 +121,24 @@ namespace Atom.Core
             _socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
             {
                 // The ReceiveBufferSize property gets or sets the number of bytes that you are expecting to store in the receive buffer for each read operation. 
-                ReceiveBufferSize = AtomGlobal.MaxRecBuffer,
+                ReceiveBufferSize = AtomGlobal.Settings.MaxRecBuffer,
                 // The SendBufferSize property gets or sets the number of bytes that you are expecting to store in the send buffer for each send operation.
-                SendBufferSize = AtomGlobal.MaxSendBuffer,
+                SendBufferSize = AtomGlobal.Settings.MaxSendBuffer,
             };
             _socket.Bind(endPoint);
             _cancelTokenSource = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
-            for (ushort i = 1; i < ushort.MaxValue; i++)
+            for (ushort i = 1; i < AtomGlobal.Settings.MaxPlayers; i++)
                 _ids.Push(i, false);
             _ids.Sort();
         }
 
-        public void Initialize(EndPoint endPoint, bool isServer)
+        public void Initialize(string address, int port, bool isServer)
         {
             IsServer = isServer;
             // Initialize the constructor!
-            __Constructor__(endPoint);
+            __Constructor__(new IPEndPoint(IPAddress.Parse(address), port));
             // Start the receive thread.
             // The Unity API doesn't allow to be called from a thread other than the main thread.
             // The Unity API wil be dispatched to the main thread.
@@ -148,24 +148,21 @@ namespace Atom.Core
             Receive();
         }
 
-        public IEnumerator Connect(EndPoint endPoint)
+        public IEnumerator Connect(string address, int port)
         {
-            if (endPoint is IPEndPoint ipEndPoint)
+            _destEndPoint = new AtomEndPoint(IPAddress.Parse(address), port);
+            while (true)
             {
-                _destEndPoint = new AtomEndPoint(ipEndPoint.Address, ipEndPoint.Port);
-                while (true)
+                using (AtomStream message = AtomStream.Get())
                 {
-                    using (AtomStream message = AtomStream.Get())
-                    {
-                        message.Write((byte)Message.ConnectAndPing);
-                        // The first packet is used to establish the connection.
-                        // We are using unrealible channel, because we don't have and exclusive Id for the connection.
-                        // We need an id to identify the connection, and the id is the "symbolic link" for the EndPoint...
-                        // As we are using an unrealible channel, we need to send connection packets until we get a response.
-                        SendToServer(message, Channel.Unreliable, Target.Single);
-                    }
-                    yield return new WaitForSeconds(0.2f);
+                    message.Write((byte)Message.ConnectAndPing);
+                    // The first packet is used to establish the connection.
+                    // We are using unrealible channel, because we don't have and exclusive Id for the connection.
+                    // We need an id to identify the connection, and the id is the "symbolic link" for the EndPoint...
+                    // As we are using an unrealible channel, we need to send connection packets until we get a response.
+                    SendToServer(message, Channel.Unreliable, Target.Single);
                 }
+                yield return new WaitForSeconds(0.2f);
             }
         }
 
@@ -177,6 +174,7 @@ namespace Atom.Core
             {
                 case Message.ConnectAndPing:
                     {
+                        Debug.Log("Client dd!");
                         if (playerId == 0)
                         {
                             if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _))
@@ -208,6 +206,7 @@ namespace Atom.Core
                         }
                         else
                         {
+                            Debug.Log("Client ping!");
                             Send(playerId);
                             writer.Write((byte)Message.ConnectAndPing);
                             SendToClient(writer, channelMode, targetMode, opMode, playerId);
@@ -215,9 +214,11 @@ namespace Atom.Core
                     }
                     break;
                 default:
+                    Debug.Log("Test");
                     return message;
             }
-            return default;
+
+            return 0;
         }
 
         public Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
@@ -288,7 +289,7 @@ namespace Atom.Core
         private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
         {
             var data = messageStream.GetBufferAsReadOnlySpan();
-            int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RealibleSize : AtomCore.UnrealibleSize;
+            int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RELIABLE_SIZE : AtomCore.UNRELIABLE_SIZE;
 #if ATOM_DEBUG
             if (messageStream.FixedSize)
             {
@@ -300,55 +301,29 @@ namespace Atom.Core
             messageStream.Write(data);
             messageStream.Position = 0;
 #if ATOM_DEBUG
-            if (((byte)channelMode) > AtomCore.ChannelMask || ((byte)targetMode) > AtomCore.TargetMask || ((byte)opMode) > AtomCore.OperationMask)
+            if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
                 throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
 #endif
             byte header = (byte)((byte)channelMode | (byte)targetMode << 2 | (byte)opMode << 5);
             messageStream.Write(header);
+            //byte playerId = 10;
             messageStream.Write(playerId);
-            using (AtomMessage _message = AtomMessage.Get())
+            switch (channelMode)
             {
-                switch (channelMode)
-                {
-                    case Channel.Reliable:
-                    case Channel.ReliableAndOrderly:
-                        {
-                            AtomChannel channelData = _channels[(playerId, (byte)channelMode)];
-                            if (seqAck == 0)
-                                seqAck = Interlocked.Increment(ref channelData.SentAck);
-                            // Write the sequence number in the header!
-                            messageStream.Write(seqAck);
-                            messageStream.Position = messageStream.CountBytes;
-                            // Write the realible message.
-                            _message.SeqAck = seqAck;
-                            _message.PlayerId = playerId;
-                            _message.LastSent = DateTime.UtcNow;
-                            _message.EndPoint = endPoint;
-                            _message.Operation = opMode;
-                            _message.Target = targetMode;
-                            _message.Channel = channelMode;
-                            _message.AtomChannel = channelData;
-                            _message.Data = messageStream.GetBufferAsCopy();
-                            break;
-                        }
-
-                    case Channel.Unreliable:
-                        messageStream.Position = messageStream.CountBytes;
-                        _message.PlayerId = playerId;
-                        _message.EndPoint = endPoint;
-                        _message.Operation = opMode;
-                        _message.Target = targetMode;
-                        _message.Channel = channelMode;
-                        _message.Data = messageStream.GetBufferAsCopy();
+                case Channel.Reliable:
+                case Channel.ReliableAndOrderly:
+                    {
+                        AtomChannel channelData = _channels[(playerId, (byte)channelMode)];
+                        if (seqAck == 0)
+                            seqAck = Interlocked.Increment(ref channelData.SentAck);
+                        messageStream.Write(seqAck);
                         break;
-                }
-                Send(_message);
+                    }
             }
-        }
 
-        private void Send(AtomMessage message)
-        {
-            Send(message.Data, message.EndPoint, message.Target, message.Channel, message.Operation, message.PlayerId, message.SeqAck, false);
+            messageStream.Position = messageStream.CountBytes;
+            byte[] _data = messageStream.GetBufferAsCopy();
+            Send(_data, endPoint, targetMode, channelMode, opMode, playerId, seqAck, false);
         }
 
         private void Send(ushort playerId)
@@ -467,11 +442,11 @@ namespace Atom.Core
                                 atomStream.Read(out byte header);
                                 atomStream.Read(out ushort playerId);
                                 // Decode the header.
-                                Channel channelMode = (Channel)(byte)(header & AtomCore.ChannelMask);
-                                Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TargetMask);
-                                Operation opMode = (Operation)(byte)((header >> 5) & AtomCore.OperationMask);
+                                Channel channelMode = (Channel)(byte)(header & AtomCore.CHANNEL_MASK);
+                                Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TARGET_MASK);
+                                Operation opMode = (Operation)(byte)((header >> 5) & AtomCore.OPERATION_MASK);
 #if ATOM_DEBUG
-                                if (((byte)channelMode) > AtomCore.ChannelMask || ((byte)targetMode) > AtomCore.TargetMask || ((byte)opMode) > AtomCore.OperationMask)
+                                if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
                                     throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
 #endif
                                 switch (channelMode)

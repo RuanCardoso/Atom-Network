@@ -49,7 +49,7 @@ namespace MessagePack.Resolvers
         {
             lookup = new global::System.Collections.Generic.Dictionary<global::System.Type, int>(1)
             {
-                { typeof(global::Atom.Core.AtomGlobal.AtomSettings), 0 },
+                { typeof(global::Atom.Core.AtomSettings), 0 },
             };
         }
 
@@ -63,7 +63,7 @@ namespace MessagePack.Resolvers
 
             switch (key)
             {
-                case 0: return new MessagePack.Formatters.Atom.Core.AtomGlobal_AtomSettingsFormatter();
+                case 0: return new MessagePack.Formatters.Atom.Core.AtomSettingsFormatter();
                 default: return null;
             }
         }

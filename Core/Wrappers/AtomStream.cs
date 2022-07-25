@@ -15,7 +15,6 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core.Wrappers
@@ -44,7 +43,7 @@ namespace Atom.Core.Wrappers
         public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
         {
             _fixedSize = false;
-            _size = MaxUdpPacketSize;
+            _size = Settings.MaxUdpPacketSize;
             _memoryBuffer = new byte[_size];
             _memoryStream = new(_memoryBuffer, 0, _size);
             _buffer = new byte[_size];
@@ -364,13 +363,13 @@ namespace Atom.Core.Wrappers
             else
             {
                 Reset();
-                AtomCore.AtomStreamPool.Push(this);
+                AtomCore.StreamPool.Push(this);
             }
         }
 
         public static AtomStream Get()
         {
-            var atomStream = AtomCore.AtomStreamPool.Pull();
+            var atomStream = AtomCore.StreamPool.Pull();
 #if ATOM_DEBUG
             return atomStream._countBytes != 0
                 ? throw new Exception("AtomStream: A item has been modified while it was in the pool!")
