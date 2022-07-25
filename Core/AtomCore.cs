@@ -35,16 +35,25 @@ namespace Atom.Core
         public const int UNRELIABLE_SIZE = 5;
 #endif
         public static AtomPooling<AtomStream> StreamPool { get; private set; }
+        public static double NetworkTime;
 
         private void Awake()
         {
             AtomGlobal.LoadSettingsFile();
-            StreamPool = new(() => new(true, false, false), AtomGlobal.Settings.MaxStreamPool, false, true, "AtomStreamPool");
+            {
+                StreamPool = new(() => new(true, false, false), AtomGlobal.Settings.MaxStreamPool, false, true, "AtomStreamPool");
+            }
         }
 
         private void Start()
         {
             Application.targetFrameRate = 60;
+            AtomTime.Stopwatch.Start();
+        }
+
+        private void Update()
+        {
+            NetworkTime = Time.timeAsDouble;
         }
     }
 }

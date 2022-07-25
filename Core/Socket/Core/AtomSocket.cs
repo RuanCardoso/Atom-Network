@@ -156,13 +156,14 @@ namespace Atom.Core
                 using (AtomStream message = AtomStream.Get())
                 {
                     message.Write((byte)Message.ConnectAndPing);
+                    message.Write(AtomTime.LocalTime);
                     // The first packet is used to establish the connection.
                     // We are using unrealible channel, because we don't have and exclusive Id for the connection.
                     // We need an id to identify the connection, and the id is the "symbolic link" for the EndPoint...
                     // As we are using an unrealible channel, we need to send connection packets until we get a response.
                     SendToServer(message, Channel.Unreliable, Target.Single);
                 }
-                yield return new WaitForSeconds(1f);
+                yield return new WaitForSeconds(0.2f);
             }
         }
 
@@ -206,9 +207,12 @@ namespace Atom.Core
                         }
                         else
                         {
-                            Debug.Log("Client ping!");
                             Send(playerId);
+                            // The client is already connected, so we need to send the ping.
+                            reader.Read(out double timeOfClient);
                             writer.Write((byte)Message.ConnectAndPing);
+                            writer.Write(timeOfClient);
+                            writer.Write(AtomTime.LocalTime);
                             SendToClient(writer, channelMode, targetMode, opMode, playerId);
                         }
                     }
@@ -235,7 +239,13 @@ namespace Atom.Core
                             AddChannel(i);
                     }
                     else
+                    {
                         Send(playerId);
+                        // The client is already connected, calculate the ping.
+                        reader.Read(out double timeOfClient);
+                        reader.Read(out double timeOfServer);
+                        AtomTime.GetNetworkTime(timeOfClient, timeOfServer);
+                    }
                     break;
                 default:
                     return message; // If not an private packet, return the packet type to process it.
