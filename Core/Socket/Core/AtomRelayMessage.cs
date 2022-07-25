@@ -25,14 +25,14 @@ namespace Atom.Core
 {
     public class AtomRelayMessage
     {
-        public AtomRelayMessage(ushort id, byte[] data, EndPoint endPoint)
+        public AtomRelayMessage(int id, byte[] data, EndPoint endPoint)
         {
             Id = id;
             Data = data;
             EndPoint = endPoint;
         }
 
-        public ushort Id { get; }
+        public int Id { get; }
         public byte[] Data { get; }
         public EndPoint EndPoint { get; }
     }

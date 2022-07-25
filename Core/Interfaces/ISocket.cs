@@ -20,12 +20,12 @@ namespace Atom.Core.Interface
 {
     public interface ISocketClient
     {
-        void OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channel, Target target, Operation operation);
+        void OnClientMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation);
     }
 
     public interface ISocketServer
     {
-        void OnServerMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channel, Target target, Operation operation);
+        void OnServerMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation);
     }
 }
 #endif

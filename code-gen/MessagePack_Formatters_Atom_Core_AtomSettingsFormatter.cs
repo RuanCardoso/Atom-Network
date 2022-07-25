@@ -34,6 +34,8 @@ namespace MessagePack.Formatters.Atom.Core
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxStreamPool() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 116, 114, 101, 97, 109, 95, 112, 111, 111, 108 };
         // bandwidth_counter
         private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthCounter() => new byte[1 + 17] { 177, 98, 97, 110, 100, 119, 105, 100, 116, 104, 95, 99, 111, 117, 110, 116, 101, 114 };
+        // incremental_gc
+        private static global::System.ReadOnlySpan<byte> GetSpan_IncrementalGc() => new byte[1 + 14] { 174, 105, 110, 99, 114, 101, 109, 101, 110, 116, 97, 108, 95, 103, 99 };
 
         public void Serialize(ref global::MessagePack.MessagePackWriter writer, global::Atom.Core.AtomSettings value, global::MessagePack.MessagePackSerializerOptions options)
         {
@@ -44,7 +46,7 @@ namespace MessagePack.Formatters.Atom.Core
             }
 
             var formatterResolver = options.Resolver;
-            writer.WriteMapHeader(8);
+            writer.WriteMapHeader(9);
             writer.WriteRaw(GetSpan_DebugMode());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.DebugMode, options);
             writer.WriteRaw(GetSpan_Encoding());
@@ -61,6 +63,8 @@ namespace MessagePack.Formatters.Atom.Core
             writer.Write(value.MaxStreamPool);
             writer.WriteRaw(GetSpan_BandwidthCounter());
             writer.Write(value.BandwidthCounter);
+            writer.WriteRaw(GetSpan_IncrementalGc());
+            writer.Write(value.IncrementalGc);
         }
 
         public global::Atom.Core.AtomSettings Deserialize(ref global::MessagePack.MessagePackReader reader, global::MessagePack.MessagePackSerializerOptions options)
@@ -97,18 +101,30 @@ namespace MessagePack.Formatters.Atom.Core
                     case 19:
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxUdpPacketSize().Slice(1))) { goto FAIL; }
 
-                        ____result.MaxUdpPacketSize = reader.ReadUInt16();
+                        ____result.MaxUdpPacketSize = reader.ReadInt32();
                         continue;
                     case 11:
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxPlayers().Slice(1))) { goto FAIL; }
 
-                        ____result.MaxPlayers = reader.ReadUInt16();
+                        ____result.MaxPlayers = reader.ReadInt32();
                         continue;
                     case 14:
-                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxRecBuffer().Slice(1))) { goto FAIL; }
+                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                        {
+                            default: goto FAIL;
+                            case 6873448998199910765UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 125779835254114UL) { goto FAIL; }
 
-                        ____result.MaxRecBuffer = reader.ReadInt32();
-                        continue;
+                                ____result.MaxRecBuffer = reader.ReadInt32();
+                                continue;
+
+                            case 7954884599298092649UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 109295633719668UL) { goto FAIL; }
+
+                                ____result.IncrementalGc = reader.ReadBoolean();
+                                continue;
+
+                        }
                     case 15:
                         switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
                         {

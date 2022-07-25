@@ -39,8 +39,8 @@ namespace Atom.Core
             for (int i = 0; i < defines.Length; i++)
             {
                 string def = defines[i];
-                if (!_defines.Contains(def)) _defines.Add(def);
-                else if (remove) _defines.Remove(def);
+                if (remove) _defines.Remove(def);
+                else if (!_defines.Contains(def)) _defines.Add(def);
             }
 
             string _defines_ = string.Join(";", _defines.ToArray());

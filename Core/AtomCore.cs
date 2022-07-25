@@ -24,8 +24,16 @@ namespace Atom.Core
         public const byte CHANNEL_MASK = 0x3;
         public const byte OPERATION_MASK = 0x3;
         public const byte TARGET_MASK = 0x7;
+#if ATOM_BYTE_PLAYER_ID
+        public const int RELIABLE_SIZE = 6;
+        public const int UNRELIABLE_SIZE = 2;
+#elif ATOM_USHORT_PLAYER_ID
         public const int RELIABLE_SIZE = 7;
         public const int UNRELIABLE_SIZE = 3;
+#elif ATOM_INT_PLAYER_ID
+        public const int RELIABLE_SIZE = 9;
+        public const int UNRELIABLE_SIZE = 5;
+#endif
         public static AtomPooling<AtomStream> StreamPool { get; private set; }
 
         private void Awake()

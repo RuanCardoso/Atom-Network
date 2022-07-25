@@ -56,13 +56,13 @@ namespace Atom.Core
     {
         internal class AtomClient
         {
-            internal AtomClient(ushort id, long address, int port)
+            internal AtomClient(int id, long address, int port)
             {
                 Id = id;
                 EndPoint = new AtomEndPoint(address, port);
             }
 
-            public ushort Id { get; }
+            public int Id { get; }
             public EndPoint EndPoint { get; }
         }
 
@@ -74,7 +74,7 @@ namespace Atom.Core
          };
 
         /// <summary> Id of connection, used to identify the connection.</summary>
-        private ushort _id = 0;
+        private int _id = 0;
         /// <summary>
         /// The socket used to receive and send the data, all data are received and sent simultaneously.
         /// Synchronous receive and send operations are used to avoid the overhead of asynchronous operations, 
@@ -97,9 +97,9 @@ namespace Atom.Core
         private CancellationTokenSource _cancelTokenSource;
         /// <summary>The list to store the connected clients. </summary>
         private readonly ConcurrentDictionary<EndPoint, AtomClient> _clientsByEndPoint = new();
-        private readonly ConcurrentDictionary<ushort, AtomClient> _clientsById = new();
+        private readonly ConcurrentDictionary<int, AtomClient> _clientsById = new();
         /// <summary>Fired when a message is full!</summary>
-        public event Action<AtomStream, AtomStream, ushort, EndPoint, Channel, Target, Operation> OnMessageCompleted;
+        public event Action<AtomStream, AtomStream, int, EndPoint, Channel, Target, Operation> OnMessageCompleted;
         /// <summary>
         /// Store the information of the channels.
         /// Ex: SentSequence, RecvSequence, Acknowledge....etc
@@ -108,9 +108,9 @@ namespace Atom.Core
         /// The acknowledgment number is used to confirm that the packet has been received, if not, the packet is resent.
         /// The sequence number is used to reorder packets, if the packet is out of order, the packet is reordered.
         /// </summary>
-        private readonly ConcurrentDictionary<(ushort, byte), AtomChannel> _channels = new();
+        private readonly ConcurrentDictionary<(int, byte), AtomChannel> _channels = new();
         /// <summary>List of exlusive id's, used to prevent the same id to be used twice.</summary>
-        private readonly AtomSafelyQueue<ushort> _ids = new(true);
+        private readonly AtomSafelyQueue<int> _ids = new(true);
         /// <summary> Returns whether the "Instance" is the Server or the Client. </summary>
         public bool IsServer { get; private set; }
 
@@ -129,7 +129,7 @@ namespace Atom.Core
             _cancelTokenSource = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
-            for (ushort i = 1; i < AtomGlobal.Settings.MaxPlayers; i++)
+            for (int i = 1; i < AtomGlobal.Settings.MaxPlayers; i++)
                 _ids.Push(i, false);
             _ids.Sort();
         }
@@ -162,11 +162,11 @@ namespace Atom.Core
                     // As we are using an unrealible channel, we need to send connection packets until we get a response.
                     SendToServer(message, Channel.Unreliable, Target.Single);
                 }
-                yield return new WaitForSeconds(0.2f);
+                yield return new WaitForSeconds(1f);
             }
         }
 
-        public Message OnServerMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
+        public Message OnServerMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
         {
             reader.Read(out byte value);
             Message message = (Message)value;
@@ -183,7 +183,7 @@ namespace Atom.Core
                                 ReturnId(socketClient.Id);
                             }
 
-                            if (GetAvailableId(out ushort id))
+                            if (GetAvailableId(out int id))
                             {
                                 if (endPoint is AtomEndPoint _endPoint)
                                 {
@@ -221,7 +221,7 @@ namespace Atom.Core
             return 0;
         }
 
-        public Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, ushort playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
+        public Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
         {
             reader.Read(out byte value);
             Message message = (Message)value;
@@ -231,7 +231,7 @@ namespace Atom.Core
                     if (_id == 0)
                     {
                         _id.Read(reader);
-                        for (ushort i = 0; i < ushort.MaxValue; i++)
+                        for (int i = 0; i < AtomGlobal.Settings.MaxPlayers; i++)
                             AddChannel(i);
                     }
                     else
@@ -244,7 +244,7 @@ namespace Atom.Core
             return default;
         }
 
-        private void AddChannel(ushort playerId)
+        private void AddChannel(int playerId)
         {
             for (int i = 0; i < _channelModes.Length; i++)
             {
@@ -254,7 +254,7 @@ namespace Atom.Core
             }
         }
 
-        private void RemoveChannel(ushort playerId)
+        private void RemoveChannel(int playerId)
         {
             for (int i = 0; i < _channelModes.Length; i++)
             {
@@ -264,7 +264,7 @@ namespace Atom.Core
             }
         }
 
-        public void SendToClient(AtomStream message, Channel channel, Target targetMode, Operation opMode, ushort playerId)
+        public void SendToClient(AtomStream message, Channel channel, Target targetMode, Operation opMode, int playerId)
         {
             if (opMode == Operation.Sequence)
                 SendToClient(message, channel, targetMode, playerId, null);
@@ -281,12 +281,12 @@ namespace Atom.Core
             Send(message, channel, targetMode, Operation.Sequence, _id, _destEndPoint, 0);
         }
 
-        private void SendToClient(AtomStream message, Channel channel, Target targetMode, ushort playerId, EndPoint endPoint)
+        private void SendToClient(AtomStream message, Channel channel, Target targetMode, int playerId, EndPoint endPoint)
         {
             Send(message, channel, targetMode, Operation.Data, playerId, endPoint, 0);
         }
 
-        private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, ushort playerId, EndPoint endPoint, int seqAck = 0)
+        private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, int playerId, EndPoint endPoint, int seqAck = 0)
         {
             var data = messageStream.GetBufferAsReadOnlySpan();
             int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RELIABLE_SIZE : AtomCore.UNRELIABLE_SIZE;
@@ -306,8 +306,13 @@ namespace Atom.Core
 #endif
             byte header = (byte)((byte)channelMode | (byte)targetMode << 2 | (byte)opMode << 5);
             messageStream.Write(header);
-            //byte playerId = 10;
-            messageStream.Write(playerId);
+#if ATOM_BYTE_PLAYER_ID
+            messageStream.Write((byte)playerId);
+#elif ATOM_USHORT_PLAYER_ID
+            messageStream.Write((ushort)playerId);
+#elif ATOM_INT_PLAYER_ID
+            messageStream.Write((int)playerId);
+#endif
             switch (channelMode)
             {
                 case Channel.Reliable:
@@ -326,7 +331,7 @@ namespace Atom.Core
             Send(_data, endPoint, targetMode, channelMode, opMode, playerId, seqAck, false);
         }
 
-        private void Send(ushort playerId)
+        private void Send(int playerId)
         {
             for (int i = 0; i < _channelModes.Length; i++)
             {
@@ -340,9 +345,9 @@ namespace Atom.Core
             }
         }
 
-        private void Send(byte[] data = default, EndPoint endPoint = default, Target target = default, Channel channel = default, Operation opMode = default, ushort playerId = default, int seqAck = default, bool isRelay = default)
+        private void Send(byte[] data = default, EndPoint endPoint = default, Target target = default, Channel channel = default, Operation opMode = default, int playerId = default, int seqAck = default, bool isRelay = default)
         {
-            void CreateRelayMessage(ushort _playerId, EndPoint endPoint)
+            void CreateRelayMessage(int _playerId, EndPoint endPoint)
             {
                 if (channel == Channel.Reliable || channel == Channel.ReliableAndOrderly)
                 {
@@ -404,8 +409,10 @@ namespace Atom.Core
             {
                 try
                 {
+#if ATOM_BANDWIDTH_COUNTER
                     // Bandwidth Control for incoming data.
                     AtomBandwidth bandwidthCounter = new();
+#endif
                     // The endpoint used store the address of the remote host.
                     // I made a wrapper for this because a lot of garbage will be created if we use the IPEndPoint directly.
                     // Note that: the client must send something to the server first(establish a connection), otherwise, the directly send from the server to the client will fail, this is called a "Handshake".
@@ -422,25 +429,39 @@ namespace Atom.Core
                     ReadOnlySpan<byte> _buffer = buffer;
                     while (!_cancelTokenSource.IsCancellationRequested)
                     {
+#if ATOM_BANDWIDTH_COUNTER
                         bandwidthCounter.Start();
+#endif
                         int bytesTransferred = _socket.ReceiveFrom(buffer, ref _peerEndPoint);
                         if (bytesTransferred >= 0)
                         {
+#if ATOM_BANDWIDTH_COUNTER
                             bandwidthCounter.Stop();
                             bandwidthCounter.Add(bytesTransferred);
                             bandwidthCounter.Get(out int bytesRate, out int messageRate);
+#endif
 #if UNITY_SERVER
                             if (bytesRate > 0 && messageRate > 0)
                                 Console.WriteLine($"Avg: Rec {bytesTransferred} bytes, {bytesRate} bytes/s, {messageRate} messages/s");
 #else
-                            //if (bytesRate > 0 && messageRate > 0)
-                            //    Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, null, "Avg: Rec {0} bytes | {1} bytes/s | {2} messages/s", bytesTransferred, bytesRate, messageRate);
+                            if (bytesRate > 0 && messageRate > 0)
+                                Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, null, "Avg: Rec {0} bytes | {1} bytes/s | {2} messages/s", bytesTransferred, bytesRate, messageRate);
 #endif
+                            int playerId = 0;
                             using (AtomStream atomStream = AtomStream.Get())
                             {
                                 atomStream.SetBuffer(_buffer[..bytesTransferred]);
                                 atomStream.Read(out byte header);
-                                atomStream.Read(out ushort playerId);
+#if ATOM_BYTE_PLAYER_ID
+                                atomStream.Read(out byte _playerId);
+                                playerId = _playerId;
+#elif ATOM_USHORT_PLAYER_ID
+                                atomStream.Read(out ushort _playerId);
+                                playerId = _playerId;
+#elif ATOM_INT_PLAYER_ID
+                                atomStream.Read(out int _playerId);
+                                playerId = _playerId;
+#endif
                                 // Decode the header.
                                 Channel channelMode = (Channel)(byte)(header & AtomCore.CHANNEL_MASK);
                                 Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TARGET_MASK);
@@ -465,7 +486,7 @@ namespace Atom.Core
                                                     AtomClient peer = _clientsById[playerId];
                                                     AtomClient otherPeer = _clientsByEndPoint[_peerEndPoint];
                                                     bool isOtherPeer = !peer.EndPoint.Equals(_peerEndPoint);
-                                                    ushort peerId = isOtherPeer ? otherPeer.Id : playerId;
+                                                    int peerId = isOtherPeer ? otherPeer.Id : playerId;
                                                     channel.MessagesToRelay.TryRemove((seqAck, peerId), out _);
                                                 }
                                             }
@@ -579,7 +600,7 @@ namespace Atom.Core
             }.Start();
         }
 
-        private bool GetAvailableId(out ushort id)
+        private bool GetAvailableId(out int id)
         {
             id = 0;
             if (_ids.Count > 0)
@@ -587,7 +608,7 @@ namespace Atom.Core
             return id != 0;
         }
 
-        private void ReturnId(ushort id) => _ids.Push(id, true);
+        private void ReturnId(int id) => _ids.Push(id, true);
         public Socket GetSocket() => _socket;
         public void Close()
         {

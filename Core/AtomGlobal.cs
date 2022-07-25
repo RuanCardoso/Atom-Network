@@ -18,7 +18,11 @@ using System;
 using System.Buffers;
 using System.IO;
 using System.Text;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UnityEngine;
+using static Atom.Core.AtomLogger;
 
 namespace Atom.Core
 {
@@ -30,9 +34,9 @@ namespace Atom.Core
         [Key("encoding")]
         public string Encoding = "ASCII";
         [Key("max_udp_packet_size")]
-        public ushort MaxUdpPacketSize = 255;
+        public int MaxUdpPacketSize = 255;
         [Key("max_players")]
-        public ushort MaxPlayers = 255;
+        public int MaxPlayers = 255;
         [Key("max_rec_buffer")]
         public int MaxRecBuffer = 8192;
         [Key("max_send_buffer")]
@@ -41,6 +45,8 @@ namespace Atom.Core
         public int MaxStreamPool = 10;
         [Key("bandwidth_counter")]
         public bool BandwidthCounter = true;
+        [Key("incremental_gc")]
+        public bool IncrementalGc = true;
     }
 
     public class AtomGlobal
@@ -49,7 +55,7 @@ namespace Atom.Core
         private const string RES_PATH = "./Assets/Resources";
         private const string PATH = RES_PATH + "/" + FILE_NAME + ".json";
         private const int MIN_MTU = 512;
-        private const int MAX_PLAYERS = ushort.MaxValue;
+        private const int MAX_PLAYERS = ushort.MaxValue * 4;
         private static readonly bool _AOT_;
         private static bool _init_;
 
@@ -109,24 +115,50 @@ namespace Atom.Core
                             if (Settings.MaxUdpPacketSize < 1) Settings.MaxUdpPacketSize = 1;
                             if (Settings.MaxUdpPacketSize > MIN_MTU)
                             {
-                                Debug.LogWarning($"Suggestion: Set \"MaxUdpPacketSize\" to {MIN_MTU} or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
-                                Debug.LogWarning("Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
+                                PrintWarning($"Suggestion: Set \"MaxUdpPacketSize\" to {MIN_MTU} or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
+                                PrintWarning("Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
                             }
 
                             if (Settings.MaxPlayers > MAX_PLAYERS)
-                                throw new System.Exception($"Max players reached! -> Only {MAX_PLAYERS} players are supported!");
+                                throw new Exception($"Max players reached! -> Only {MAX_PLAYERS} players are supported!");
 #if UNITY_EDITOR
+                            BuildTarget activeBuildTarget = EditorUserBuildSettings.activeBuildTarget;
+                            BuildTargetGroup targetGroup = BuildPipeline.GetBuildTargetGroup(activeBuildTarget);
+
+                            if (PlayerSettings.GetApiCompatibilityLevel(targetGroup) != ApiCompatibilityLevel.NET_Standard || PlayerSettings.GetApiCompatibilityLevel(UnityEditor.Build.NamedBuildTarget.Server) != ApiCompatibilityLevel.NET_Standard)
+                                PrintWarning("Suggestion: Set the \"Api Compatibility Level\" to .NET Standard 2.1 or higher to best support Atom!");
+
+                            PlayerSettings.gcIncremental = Settings.IncrementalGc;
                             AtomHelper.SetDefine(!Settings.BandwidthCounter, "", "ATOM_BANDWIDTH_COUNTER");
                             switch (Settings.DebugMode.ToLower())
                             {
                                 case "debug":
                                     AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
+                                    PlayerSettings.SetIl2CppCompilerConfiguration(targetGroup, Il2CppCompilerConfiguration.Debug);
+                                    PlayerSettings.SetIl2CppCompilerConfiguration(UnityEditor.Build.NamedBuildTarget.Server, Il2CppCompilerConfiguration.Debug);
                                     break;
                                 case "release":
                                     AtomHelper.SetDefine(false, "ATOM_DEBUG", "ATOM_RELEASE");
+                                    PlayerSettings.SetIl2CppCompilerConfiguration(targetGroup, Il2CppCompilerConfiguration.Master);
+                                    PlayerSettings.SetIl2CppCompilerConfiguration(UnityEditor.Build.NamedBuildTarget.Server, Il2CppCompilerConfiguration.Master);
                                     break;
                                 default:
-                                    throw new System.Exception("Atom.Core: Debug mode not found!");
+                                    throw new Exception("Atom.Core: Debug mode not found!");
+                            }
+
+                            switch (Settings.MaxPlayers)
+                            {
+                                case <= byte.MaxValue:
+                                    AtomHelper.SetDefine(false, "ATOM_USHORT_PLAYER_ID;ATOM_INT_PLAYER_ID", "ATOM_BYTE_PLAYER_ID");
+                                    break;
+                                case <= ushort.MaxValue:
+                                    AtomHelper.SetDefine(false, "ATOM_INT_PLAYER_ID;ATOM_BYTE_PLAYER_ID", "ATOM_USHORT_PLAYER_ID");
+                                    break;
+                                case <= int.MaxValue:
+                                    AtomHelper.SetDefine(false, "ATOM_BYTE_PLAYER_ID;ATOM_USHORT_PLAYER_ID", "ATOM_INT_PLAYER_ID");
+                                    break;
+                                default:
+                                    throw new Exception("Long player IDs are not supported!");
                             }
 #endif
                             try

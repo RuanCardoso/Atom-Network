@@ -33,7 +33,7 @@ namespace Atom.Core
         /// <summary>This value returns the last sequence number processed.</summary>
         public int LastProcessedSequentialAck { get; set; } = Syn;
         /// <summary> List of the packets that are waiting to be re-sent.</summary>
-        public ConcurrentDictionary<(int, ushort), AtomRelayMessage> MessagesToRelay = new();
+        public ConcurrentDictionary<(int, int), AtomRelayMessage> MessagesToRelay = new();
         /// <summary>Any sequence is received is added to this list, It's only used to check if the sequence is already received.</summary>
         public HashSet<int> Acknowledgements = new();
         /// <summary> All messages are added to this list is automatically sorted by sequence number.</summary>
