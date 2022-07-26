@@ -298,7 +298,7 @@ namespace Atom.Core
 
         private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, int playerId, EndPoint endPoint, int seqAck = 0)
         {
-            var data = messageStream.GetBufferAsReadOnlySpan();
+            var data = messageStream.GetBuffer();
             int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RELIABLE_SIZE : AtomCore.UNRELIABLE_SIZE;
 #if ATOM_DEBUG
             if (messageStream.FixedSize)
@@ -307,8 +307,9 @@ namespace Atom.Core
                     throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + messageStream.Size + " but you need " + (data.Length + defSize) + ".");
             }
 #endif
+            int countBytes = messageStream.CountBytes;
             messageStream.Reset(pos: defSize);
-            messageStream.Write(data);
+            messageStream.Write(data, 0, countBytes);
             messageStream.Position = 0;
 #if ATOM_DEBUG
             if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
@@ -338,7 +339,8 @@ namespace Atom.Core
 
             messageStream.Position = messageStream.CountBytes;
             byte[] _data = messageStream.GetBuffer();
-            Send(_data, messageStream.CountBytes, endPoint, targetMode, channelMode, opMode, playerId, seqAck, false);
+            countBytes = messageStream.CountBytes;
+            Send(_data, countBytes, endPoint, targetMode, channelMode, opMode, playerId, seqAck, false);
         }
 
         private void Send(int playerId)
@@ -421,13 +423,13 @@ namespace Atom.Core
         {
             new Thread(() =>
             {
-                void internal_Send(ReadOnlySpan<byte> data, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
+                void internal_Send(byte[] data, int length, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
                 {
                     using (AtomStream reader = AtomStream.Get())
                     {
                         using (AtomStream writer = AtomStream.Get())
                         {
-                            reader.SetBuffer(data);
+                            reader.SetBuffer(data, 0, length);
                             OnMessageCompleted(reader, writer, playerId, endPoint, channel, target, operation, IsServer);
                         }
                     }
@@ -476,7 +478,7 @@ namespace Atom.Core
                             int playerId = 0;
                             using (AtomStream atomStream = AtomStream.Get())
                             {
-                                atomStream.SetBuffer(_buffer[..bytesTransferred]);
+                                atomStream.SetBuffer(buffer, 0, bytesTransferred);
                                 atomStream.Read(out byte header);
 #if ATOM_BYTE_PLAYER_ID
                                 atomStream.Read(out byte _playerId);
@@ -518,7 +520,7 @@ namespace Atom.Core
                                             }
                                             else
                                             {
-                                                ReadOnlySpan<byte> data = atomStream.ReadNext();
+                                                byte[] data = atomStream.ReadNext(out int length);
                                                 using (AtomStream ackStream = AtomStream.Get())
                                                     Send(ackStream, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
 
@@ -529,7 +531,7 @@ namespace Atom.Core
                                                             if (!channel.Acks.Add(seqAck))
                                                                 continue;
 
-                                                            internal_Send(data, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                            internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                             break;
                                                         }
 
@@ -550,7 +552,7 @@ namespace Atom.Core
                                                                 if (channel.Acks.Count == range)
                                                                 {
                                                                     foreach (var (key, value) in channel.SequentialData)
-                                                                        internal_Send(value, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                                        internal_Send(value, value.Length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
 
                                                                     channel.ExpectedAck = max + 1;
                                                                     channel.Acks.Clear();
@@ -569,8 +571,8 @@ namespace Atom.Core
 
                                     case Channel.Unreliable:
                                         {
-                                            ReadOnlySpan<byte> data = atomStream.ReadNext();
-                                            internal_Send(data, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                            byte[] data = atomStream.ReadNext(out int length);
+                                            internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                             break;
                                         }
                                 }

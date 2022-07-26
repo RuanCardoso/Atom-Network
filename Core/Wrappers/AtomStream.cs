@@ -41,6 +41,7 @@ namespace Atom.Core.Wrappers
         public bool FixedSize => _fixedSize;
         public int Size => _size;
         public int CountBytes => _countBytes;
+        public int BytesRemaining => (int)(CountBytes - Position);
 
         public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
         {
@@ -239,12 +240,19 @@ namespace Atom.Core.Wrappers
             value = Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
         }
 
-        public ReadOnlySpan<byte> ReadNext()
+        public ReadOnlySpan<byte> ReadNextAsReadOnlySpan()
         {
-            ReadOnlySpan<byte> _bytes = _buffer;
-            int bytesRemaining = (int)(_countBytes - _memoryStream.Position);
+            int bytesRemaining = BytesRemaining;
             Read(bytesRemaining);
+            ReadOnlySpan<byte> _bytes = _buffer;
             return _bytes[..bytesRemaining];
+        }
+
+        public byte[] ReadNext(out int bytesRemaining)
+        {
+            bytesRemaining = BytesRemaining;
+            Read(bytesRemaining);
+            return _buffer;
         }
 
         private void Read(int count, int offset = 0)
@@ -317,6 +325,12 @@ namespace Atom.Core.Wrappers
         public void SetBuffer(ReadOnlySpan<byte> buffer)
         {
             Write(buffer);
+            _memoryStream.Position = 0;
+        }
+
+        public void SetBuffer(byte[] buffer, int offset, int count)
+        {
+            Write(buffer, offset, count);
             _memoryStream.Position = 0;
         }
 
