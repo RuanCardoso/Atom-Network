@@ -72,7 +72,7 @@ namespace Atom.Core
                 CreateFileWatcher(RES_PATH);
                 CreateSettingsFile();
 #else
-                _init_ = true;
+                _INIT_ = true;
 #endif
             }
         }
