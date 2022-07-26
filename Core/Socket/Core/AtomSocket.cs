@@ -39,6 +39,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Interface;
 using Atom.Core.Wrappers;
 using System;
 using System.Collections;
@@ -52,7 +53,7 @@ using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace Atom.Core
 {
-    public sealed class AtomSocket
+    public sealed class AtomSocket : ISocket
     {
         internal class AtomClient
         {
@@ -98,8 +99,6 @@ namespace Atom.Core
         /// <summary>The list to store the connected clients. </summary>
         private readonly ConcurrentDictionary<EndPoint, AtomClient> _clientsByEndPoint = new();
         private readonly ConcurrentDictionary<int, AtomClient> _clientsById = new();
-        /// <summary>Fired when a message is full!</summary>
-        public event Action<AtomStream, AtomStream, int, EndPoint, Channel, Target, Operation> OnMessageCompleted;
         /// <summary>
         /// Store the information of the channels.
         /// Ex: SentSequence, RecvSequence, Acknowledge....etc
@@ -113,6 +112,12 @@ namespace Atom.Core
         private readonly AtomSafelyQueue<int> _ids = new(true);
         /// <summary> Returns whether the "Instance" is the Server or the Client. </summary>
         public bool IsServer { get; private set; }
+
+        private ISocket ISocket;
+        public AtomSocket(ISocket iSocket)
+        {
+            ISocket = iSocket;
+        }
 
 #pragma warning disable IDE1006
         private void __Constructor__(EndPoint endPoint)
@@ -173,7 +178,7 @@ namespace Atom.Core
             }
         }
 
-        public Message OnServerMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
+        public void OnMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, bool isServer)
         {
             reader.Read(out byte value);
             Message message = (Message)value;
@@ -181,82 +186,72 @@ namespace Atom.Core
             {
                 case Message.ConnectAndPing:
                     {
-                        if (playerId == 0)
+                        if (isServer)
                         {
-                            if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _))
+                            if (playerId == 0)
                             {
-                                RemoveChannel(socketClient.Id);
-                                ReturnId(socketClient.Id);
-                            }
-
-                            if (GetAvailableId(out int id))
-                            {
-                                if (endPoint is AtomEndPoint _endPoint)
+                                if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _))
                                 {
-                                    long address = _endPoint.GetIPAddress();
-                                    int port = _endPoint.GetPort();
-                                    AtomClient client = new(id, address, port);
-                                    if (_clientsByEndPoint.TryAdd(client.EndPoint, client) && _clientsById.TryAdd(id, client))
-                                    {
-                                        AddChannel(id);
-                                        writer.Write((byte)Message.ConnectAndPing);
-                                        writer.Write(id);
-                                        SendToClient(writer, channelMode, targetMode, opMode, id);
-                                    }
-                                    else
-                                        Debug.LogError("Client not added!");
+                                    RemoveChannel(socketClient.Id);
+                                    ReturnId(socketClient.Id);
                                 }
+
+                                if (GetAvailableId(out int id))
+                                {
+                                    if (endPoint is AtomEndPoint _endPoint)
+                                    {
+                                        long address = _endPoint.GetIPAddress();
+                                        int port = _endPoint.GetPort();
+                                        AtomClient client = new(id, address, port);
+                                        if (_clientsByEndPoint.TryAdd(client.EndPoint, client) && _clientsById.TryAdd(id, client))
+                                        {
+                                            AddChannel(id);
+                                            writer.Write((byte)Message.ConnectAndPing);
+                                            writer.Write(id);
+                                            SendToClient(writer, channelMode, targetMode, opMode, id);
+                                        }
+                                        else
+                                            Debug.LogError("Client not added!");
+                                    }
+                                }
+                                else
+                                    Debug.LogError("No available id's!");
                             }
                             else
-                                Debug.LogError("No available id's!");
+                            {
+                                Send(playerId);
+                                // The client is already connected, so we need to send the ping.
+                                reader.Read(out double timeOfClient);
+                                writer.Write((byte)Message.ConnectAndPing);
+                                writer.Write(timeOfClient);
+                                writer.Write(AtomTime.LocalTime);
+                                SendToClient(writer, channelMode, targetMode, opMode, playerId);
+                            }
                         }
-                        else
+                        else if (!isServer)
                         {
-                            Send(playerId);
-                            // The client is already connected, so we need to send the ping.
-                            reader.Read(out double timeOfClient);
-                            writer.Write((byte)Message.ConnectAndPing);
-                            writer.Write(timeOfClient);
-                            writer.Write(AtomTime.LocalTime);
-                            SendToClient(writer, channelMode, targetMode, opMode, playerId);
+                            if (_id == 0)
+                            {
+                                _id.Read(reader);
+                                for (int i = 0; i < AtomGlobal.Settings.MaxPlayers; i++)
+                                    AddChannel(i);
+                            }
+                            else
+                            {
+                                Send(playerId);
+                                reader.Read(out double timeOfClient);
+                                reader.Read(out double timeOfServer);
+                                AtomTime.GetNetworkTime(timeOfClient, timeOfServer);
+                                AtomTime.ReceivedMessages++;
+                            }
                         }
                     }
                     break;
                 default:
-                    Debug.Log("Test");
-                    return message;
-            }
-
-            return 0;
-        }
-
-        public Message OnClientMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode)
-        {
-            reader.Read(out byte value);
-            Message message = (Message)value;
-            switch (message)
-            {
-                case Message.ConnectAndPing:
-                    if (_id == 0)
-                    {
-                        _id.Read(reader);
-                        for (int i = 0; i < AtomGlobal.Settings.MaxPlayers; i++)
-                            AddChannel(i);
-                    }
-                    else
-                    {
-                        Send(playerId);
-                        reader.Read(out double timeOfClient);
-                        reader.Read(out double timeOfServer);
-                        AtomTime.GetNetworkTime(timeOfClient, timeOfServer);
-                        AtomTime.ReceivedMessages++;
-                    }
+                    reader.Position = 0;
+                    ISocket.OnMessageCompleted(reader, writer, playerId, endPoint, channelMode, targetMode, opMode, IsServer);
                     break;
-                default:
-                    return message; // If not an private packet, return the packet type to process it.
             }
-            // If is a private packet, return null to ignore it.
-            return default;
         }
 
         private void AddChannel(int playerId)
@@ -525,7 +520,7 @@ namespace Atom.Core
                                                                 using (AtomStream writer = AtomStream.Get())
                                                                 {
                                                                     reader.SetBuffer(data);
-                                                                    OnMessageCompleted?.Invoke(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                                 }
                                                             }
 
@@ -553,7 +548,7 @@ namespace Atom.Core
                                                                                 using (AtomStream writer = AtomStream.Get())
                                                                                 {
                                                                                     reader.SetBuffer(KvP.Value);
-                                                                                    OnMessageCompleted?.Invoke(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                                                 }
                                                                             }
                                                                             channel.LastProcessedSequentialAck++;
@@ -583,7 +578,7 @@ namespace Atom.Core
                                                 using (AtomStream writer = AtomStream.Get())
                                                 {
                                                     reader.SetBuffer(data);
-                                                    OnMessageCompleted?.Invoke(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode);
+                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                 }
                                             }
 

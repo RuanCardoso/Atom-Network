@@ -50,11 +50,8 @@ namespace Atom.Core
 #endif
         public static bool AOT()
         {
-            StaticCompositeResolver.Instance.Register(
-                GeneratedResolver.Instance,
-                StandardResolver.Instance);
-            MessagePackSerializer.DefaultOptions =
-                MessagePackSerializerOptions.Standard.WithResolver(StaticCompositeResolver.Instance);
+            StaticCompositeResolver.Instance.Register(GeneratedResolver.Instance, StandardResolver.Instance);
+            MessagePackSerializer.DefaultOptions = MessagePackSerializerOptions.Standard.WithResolver(StaticCompositeResolver.Instance);
             return true;
         }
 

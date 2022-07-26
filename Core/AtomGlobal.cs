@@ -57,7 +57,7 @@ namespace Atom.Core
         private const int MIN_MTU = 512;
         private const int MAX_PLAYERS = ushort.MaxValue * 4;
         private static readonly bool _AOT_;
-        private static bool _init_;
+        private static bool _INIT_;
 
         public static ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Create();
         public static Encoding Encoding;
@@ -78,7 +78,7 @@ namespace Atom.Core
         }
 
 #if UNITY_EDITOR
-        static void CreateSettingsFile()
+        private static void CreateSettingsFile()
         {
             if (!Directory.Exists(RES_PATH)) Directory.CreateDirectory(RES_PATH);
             if (!File.Exists(PATH))
@@ -89,7 +89,7 @@ namespace Atom.Core
                 }
             }
             else
-                _init_ = true;
+                _INIT_ = true;
         }
 #endif
 
@@ -97,7 +97,7 @@ namespace Atom.Core
         {
             try
             {
-                if (_init_)
+                if (_INIT_)
                 {
 #if !UNITY_EDITOR
                     var asset = Resources.Load<TextAsset>(FILE_NAME);
@@ -116,7 +116,7 @@ namespace Atom.Core
                             if (Settings.MaxUdpPacketSize > MIN_MTU)
                             {
                                 PrintWarning($"Suggestion: Set \"MaxUdpPacketSize\" to {MIN_MTU} or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
-                                PrintWarning("Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
+                                PrintWarning($"Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
                             }
 
                             if (Settings.MaxPlayers > MAX_PLAYERS)
@@ -124,11 +124,13 @@ namespace Atom.Core
 #if UNITY_EDITOR
                             BuildTarget activeBuildTarget = EditorUserBuildSettings.activeBuildTarget;
                             BuildTargetGroup targetGroup = BuildPipeline.GetBuildTargetGroup(activeBuildTarget);
-
                             if (PlayerSettings.GetApiCompatibilityLevel(targetGroup) != ApiCompatibilityLevel.NET_Standard || PlayerSettings.GetApiCompatibilityLevel(UnityEditor.Build.NamedBuildTarget.Server) != ApiCompatibilityLevel.NET_Standard)
                                 PrintWarning("Suggestion: Set the \"Api Compatibility Level\" to .NET Standard 2.1 or higher to best support Atom!");
 
                             PlayerSettings.gcIncremental = Settings.IncrementalGc;
+                            if (!PlayerSettings.gcIncremental)
+                                PrintWarning("Suggestion: Enable \"Incremental GC\" to best performance!");
+
                             AtomHelper.SetDefine(!Settings.BandwidthCounter, "", "ATOM_BANDWIDTH_COUNTER");
                             switch (Settings.DebugMode.ToLower())
                             {
@@ -167,15 +169,14 @@ namespace Atom.Core
                             }
                             catch
                             {
-                                Debug.LogWarning("Atom: Encoding not found! Using default encoding (ASCII).");
-                                Encoding = Encoding.ASCII;
+                                throw new Exception("Atom.Core: Encoding not found!");
                             }
                         }
                         else
-                            Debug.LogWarning("Atom: Deserialization error! Settings not found!");
+                            throw new Exception("Atom.Core: Settings not found!");
                     }
                     else
-                        Debug.LogWarning($"Atom: Settings file not loaded! Please, check if the file \"{FILE_NAME}.json\" is in the \"Resources\" folder.");
+                        throw new Exception("Atom.Core: Settings file not found!");
                 }
             }
             catch (Exception ex)

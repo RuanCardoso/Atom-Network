@@ -18,14 +18,10 @@ using System.Net;
 
 namespace Atom.Core.Interface
 {
-    public interface ISocketClient
+    public interface ISocket
     {
-        void OnClientMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation);
+        void OnMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer);
     }
 
-    public interface ISocketServer
-    {
-        void OnServerMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation);
-    }
 }
 #endif

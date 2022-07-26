@@ -18,26 +18,16 @@ namespace Atom.Core.Objects
 {
     public class ExpAvg
     {
-        private bool _initialized;
+        private bool _init;
         private double _alpha;
 
-        public double Avg
-        {
-            get;
-            private set;
-        }
-
-        public double Slope
-        {
-            get;
-            private set;
-        }
+        public double Avg { get; private set; }
+        public double Slope { get; private set; }
 
         public ExpAvg(int size) => _alpha = 2.0d / (size + 1);
-
         public void Increment(double value)
         {
-            if (_initialized)
+            if (_init)
             {
                 double delta = value - Avg;
                 Avg += _alpha * delta;
@@ -45,27 +35,20 @@ namespace Atom.Core.Objects
             }
             else
             {
-                if (!_initialized)
+                if (!_init)
                 {
                     Avg = value;
-                    _initialized = true;
+                    _init = true;
                 }
-                //else
-                //    LogHelper.Error("Avg has been initialized!");
             }
         }
 
         public void Reset(int size)
         {
-            if (Avg > 0)
+            if (Avg > 0 && _init)
             {
-                if (_initialized)
-                {
-                    _initialized = false;
-                    _alpha = 2.0d / (size + 1);
-                }
-                //else
-                //    LogHelper.Error("Avg not initialized!");
+                _init = false;
+                _alpha = 2.0d / (size + 1);
             }
         }
     }
