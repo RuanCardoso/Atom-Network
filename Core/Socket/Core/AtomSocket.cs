@@ -174,7 +174,7 @@ namespace Atom.Core
                     // As we are using an unrealible channel, we need to send connection packets until we get a response.
                     SendToServer(message, Channel.Unreliable, Target.Single);
                 }
-                yield return new WaitForSeconds(0.2f);
+                yield return new WaitForSeconds(1f);
             }
         }
 
@@ -376,6 +376,7 @@ namespace Atom.Core
                 }
             }
 
+            int sendTo = 0;
             if (IsServer)
             {
                 EndPoint _endPoint = _clientsById[playerId].EndPoint;
@@ -390,7 +391,7 @@ namespace Atom.Core
                             {
                                 AtomClient client = KvP.Value;
                                 if (!isRelay) CreateRelayMessage(client.Id, client.EndPoint);
-                                _socket.SendTo(data, client.EndPoint);
+                                sendTo = _socket.SendTo(data, client.EndPoint);
                             }
                             else
                                 continue;
@@ -401,7 +402,7 @@ namespace Atom.Core
                     case Target.Single:
                         {
                             if (!isRelay) CreateRelayMessage(playerId, _endPoint);
-                            _socket.SendTo(data, _endPoint);
+                            sendTo = _socket.SendTo(data, _endPoint);
                         }
                         break;
                 }
@@ -409,8 +410,11 @@ namespace Atom.Core
             else
             {
                 if (!isRelay) CreateRelayMessage(playerId, endPoint);
-                _socket.SendTo(data, endPoint);
+                sendTo = _socket.SendTo(data, endPoint);
             }
+
+            if (sendTo != data.Length)
+                AtomLogger.PrintError("[Atom] -> Send -> The data was not sent correctly. Sent " + sendTo + " bytes but it should have sent " + data.Length + " bytes.");
         }
 
         private void Receive()
@@ -522,7 +526,7 @@ namespace Atom.Core
                                                 {
                                                     case Channel.Reliable:
                                                         {
-                                                            if (!channel.Acknowledgements.Add(seqAck))
+                                                            if (!channel.Acks.Add(seqAck))
                                                                 continue;
 
                                                             internal_Send(data, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
@@ -531,25 +535,25 @@ namespace Atom.Core
 
                                                     case Channel.ReliableAndOrderly:
                                                         {
-                                                            if (!channel.Acknowledgements.Add(seqAck))
+                                                            if (seqAck < channel.ExpectedAck)
+                                                                continue;
+                                                            if (!channel.Acks.Add(seqAck))
                                                                 continue;
 
                                                             byte[] _data_ = data.ToArray();
-                                                            int minAck = channel.Acknowledgements.Min();
-                                                            int maxAck = channel.Acknowledgements.Max();
+                                                            int min = channel.Acks.Min();
+                                                            int max = channel.Acks.Max();
                                                             channel.SequentialData.Add(seqAck, _data_);
-                                                            if (minAck == channel.ExpectedAcknowledgement)
+                                                            if (min == channel.ExpectedAck)
                                                             {
-                                                                int range = maxAck - (minAck - 1);
-                                                                if (channel.Acknowledgements.Count == range)
+                                                                int range = max - (min - 1);
+                                                                if (channel.Acks.Count == range)
                                                                 {
                                                                     foreach (var (key, value) in channel.SequentialData)
-                                                                    {
                                                                         internal_Send(value, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
-                                                                    }
 
-                                                                    channel.ExpectedAcknowledgement = maxAck + 1;
-                                                                    channel.Acknowledgements.Clear();
+                                                                    channel.ExpectedAck = max + 1;
+                                                                    channel.Acks.Clear();
                                                                     channel.SequentialData.Clear();
                                                                 }
                                                                 else { /* Get missing messages  */}

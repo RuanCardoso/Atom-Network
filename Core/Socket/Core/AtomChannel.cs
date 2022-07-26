@@ -19,18 +19,16 @@
 #if UNITY_2021_3_OR_NEWER
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Atom.Core
 {
     public class AtomChannel
     {
-        static int Syn { get; } = 0;
-        public int SentAck = Syn;
+        public int SentAck = 0;
         public ConcurrentDictionary<(int, int), AtomRelayMessage> MessagesToRelay = new();
-        public HashSet<int> Acknowledgements = new();
+        public HashSet<int> Acks = new();
         public SortedDictionary<int, byte[]> SequentialData = new();
-        public int ExpectedAcknowledgement { get; set; } = Syn + 1;
+        public int ExpectedAck { get; set; } = 1;
     }
 }
 #endif
