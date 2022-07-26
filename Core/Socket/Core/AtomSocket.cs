@@ -337,8 +337,8 @@ namespace Atom.Core
             }
 
             messageStream.Position = messageStream.CountBytes;
-            byte[] _data = messageStream.GetBufferAsCopy();
-            Send(_data, endPoint, targetMode, channelMode, opMode, playerId, seqAck, false);
+            byte[] _data = messageStream.GetBuffer();
+            Send(_data, messageStream.CountBytes, endPoint, targetMode, channelMode, opMode, playerId, seqAck, false);
         }
 
         private void Send(int playerId)
@@ -350,12 +350,12 @@ namespace Atom.Core
                 for (int y = 0; y < messages.Count; y++)
                 {
                     var relayMessage = messages[y];
-                    Send(isRelay: true, data: relayMessage.Data, endPoint: relayMessage.EndPoint, target: Target.Single, playerId: relayMessage.Id);
+                    Send(isRelay: true, data: relayMessage.Data, length: relayMessage.Data.Length, endPoint: relayMessage.EndPoint, target: Target.Single, playerId: relayMessage.Id);
                 }
             }
         }
 
-        private void Send(byte[] data = default, EndPoint endPoint = default, Target target = default, Channel channel = default, Operation opMode = default, int playerId = default, int seqAck = default, bool isRelay = default)
+        private void Send(byte[] data = default, int length = 0, EndPoint endPoint = default, Target target = default, Channel channel = default, Operation opMode = default, int playerId = default, int seqAck = default, bool isRelay = default)
         {
             void CreateRelayMessage(int _playerId, EndPoint endPoint)
             {
@@ -369,8 +369,8 @@ namespace Atom.Core
                     if (opMode == Operation.Acknowledgement)
                         return;
 
-                    byte[] _data = new byte[data.Length];
-                    Buffer.BlockCopy(data, 0, _data, 0, data.Length);
+                    byte[] _data = new byte[length];
+                    Buffer.BlockCopy(data, 0, _data, 0, length);
                     if (!_channels[(playerId, (byte)channel)].MessagesToRelay.TryAdd((seqAck, _playerId), new(_playerId, _data, endPoint)))
                         Debug.LogError("[Atom] -> Relay message already exists!");
                 }
@@ -384,14 +384,14 @@ namespace Atom.Core
                 {
                     case Target.All:
                         if (!isRelay) CreateRelayMessage(playerId, _endPoint);
-                        _socket.SendTo(data, _endPoint);
+                        _socket.SendTo(data, length, SocketFlags.None, _endPoint);
                         foreach (var KvP in _clientsByEndPoint.ToList())
                         {
                             if (!KvP.Key.Equals(_endPoint))
                             {
                                 AtomClient client = KvP.Value;
                                 if (!isRelay) CreateRelayMessage(client.Id, client.EndPoint);
-                                sendTo = _socket.SendTo(data, client.EndPoint);
+                                sendTo = _socket.SendTo(data, length, SocketFlags.None, client.EndPoint);
                             }
                             else
                                 continue;
@@ -402,7 +402,7 @@ namespace Atom.Core
                     case Target.Single:
                         {
                             if (!isRelay) CreateRelayMessage(playerId, _endPoint);
-                            sendTo = _socket.SendTo(data, _endPoint);
+                            sendTo = _socket.SendTo(data, length, SocketFlags.None, _endPoint);
                         }
                         break;
                 }
@@ -410,11 +410,11 @@ namespace Atom.Core
             else
             {
                 if (!isRelay) CreateRelayMessage(playerId, endPoint);
-                sendTo = _socket.SendTo(data, endPoint);
+                sendTo = _socket.SendTo(data, length, SocketFlags.None, endPoint);
             }
 
-            if (sendTo != data.Length)
-                AtomLogger.PrintError("[Atom] -> Send -> The data was not sent correctly. Sent " + sendTo + " bytes but it should have sent " + data.Length + " bytes.");
+            if (sendTo != length)
+                AtomLogger.PrintError("[Atom] -> Send -> The data was not sent correctly. Sent " + sendTo + " bytes but it should have sent " + length + " bytes.");
         }
 
         private void Receive()

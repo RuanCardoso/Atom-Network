@@ -320,13 +320,7 @@ namespace Atom.Core.Wrappers
             _memoryStream.Position = 0;
         }
 
-        public ReadOnlySpan<byte> GetBufferAsReadOnlySpan()
-        {
-            ReadOnlySpan<byte> _buffer = _memoryBuffer;
-            return _buffer[.._countBytes];
-        }
-
-        public byte[] GetBufferAsCopy()
+        public byte[] ToArray()
         {
             if (!_fixedSize) // GC Alloc Here
             {
@@ -335,6 +329,14 @@ namespace Atom.Core.Wrappers
             }
             else
                 return _memoryBuffer;
+        }
+
+        public byte[] GetBuffer() =>
+            _memoryBuffer;
+        public ReadOnlySpan<byte> GetBufferAsReadOnlySpan()
+        {
+            ReadOnlySpan<byte> _buffer = _memoryBuffer;
+            return _buffer[.._countBytes];
         }
 
         public void Reset(int pos = 0, int countBytes = 0)
