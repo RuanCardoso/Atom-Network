@@ -31,11 +31,13 @@ namespace Atom.Core.Wrappers
         private readonly bool _fixedSize;
         private readonly bool _readOnly;
         private readonly bool _writerOnly;
+
         public long Position
         {
             get => _memoryStream.Position;
             set => _memoryStream.Position = value;
         }
+
         public bool FixedSize => _fixedSize;
         public int Size => _size;
         public int CountBytes => _countBytes;
@@ -199,11 +201,12 @@ namespace Atom.Core.Wrappers
             byte b;
             do
             {
+#if ATOM_DEBUG
                 // Check for a corrupted stream.  Read a max of 5 bytes.
                 // In a future version, add a DataFormatException.
                 if (shift == 5 * 7)  // 5 bytes max per Int32, shift += 7
                     throw new FormatException("corrupted stream.");
-
+#endif
                 // ReadByte handles end of stream cases for us.
                 b = (byte)_memoryStream.ReadByte();
                 count |= (b & 0x7F) << shift;
@@ -215,9 +218,10 @@ namespace Atom.Core.Wrappers
         public void Write(string value, bool inStackAlloc = false)
         {
             int getByteCount = Encoding.GetByteCount(value);
+#if ATOM_DEBUG
             if (_size < getByteCount)
                 throw new Exception($"_size is less than {getByteCount}, can't write string!");
-
+#endif
             byte[] rentBytes = !inStackAlloc ? ArrayPool.Rent(getByteCount) : null;
             Span<byte> _rentBytes = !inStackAlloc ? rentBytes : stackalloc byte[getByteCount];
             int bytesCount = Encoding.GetBytes(value, _rentBytes);
@@ -257,8 +261,10 @@ namespace Atom.Core.Wrappers
                 int bytesRead = _memoryStream.Read(_buffer, offset, bytesRemaining);
                 if (bytesRead > 0)
                     offset += bytesRead;
+#if ATOM_DEBUG
                 else
                     throw new Exception("AtomStream: Read: End of stream reached, there is no data to read.");
+#endif
             }
         }
 

@@ -49,8 +49,9 @@ namespace Atom.Core.Wrappers
                 if (_createNewObjectIfNotAvailable)
                     return _generator();
                 else
-                    UnityEngine.Debug.LogFormat(UnityEngine.LogType.Error, UnityEngine.LogOption.NoStacktrace, null, "{0}", $"Memory Leak: [>{_name}<]: You overflowed the pool! You won't get the performance benefits of the pool. Increase the pool capacity, if the error happens again, you may be forgetting to return the item to the pool.");
+                    AtomLogger.PrintError($"Memory Leak: [>{_name}<]: You overflowed the pool! You won't get the performance benefits of the pool. Increase the pool capacity, if the error happens again, you may be forgetting to return the item to the pool.");
             }
+
             return _generator();
         }
 

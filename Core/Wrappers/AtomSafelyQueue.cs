@@ -20,15 +20,15 @@ namespace Atom.Core.Wrappers
 {
     public class AtomSafelyQueue<T>
     {
-        private readonly Queue<T> _queue = new();
         private readonly object _lock = new();
-        private readonly int _capacity = 0;
+        private readonly Queue<T> _queue = new();
+        private readonly int _size = 0;
         private readonly bool _sort = false;
 
         public AtomSafelyQueue(bool sort = false) => _sort = sort;
-        public AtomSafelyQueue(int capacity, bool sort = false)
+        public AtomSafelyQueue(int size, bool sort = false)
         {
-            _capacity = capacity;
+            _size = size;
             _sort = sort;
         }
 
@@ -36,9 +36,9 @@ namespace Atom.Core.Wrappers
         {
             lock (_lock)
             {
-                if (_capacity > 0)
+                if (_size > 0)
                 {
-                    if (_queue.Count < _capacity)
+                    if (_queue.Count < _size)
                         _queue.Enqueue(item);
                 }
                 else

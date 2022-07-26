@@ -47,14 +47,10 @@ namespace Atom.Core
     {
         /// <summary>Send the message to all players.</summary>
         All,
-        /// <summary>Send the message to all players, executes it immediately on this client.</summary>
-        AllImmediately,
         /// <summary>Send the message to all players, except you.</summary>
         Others,
         /// <summary>Send the message only to yourself.</summary>
         Single,
-        /// <summary>Send the message only to yourself.</summary>
-        SingleImmediately,
         /// <summary>Send the message to the server only.</summary>
         Server
     }

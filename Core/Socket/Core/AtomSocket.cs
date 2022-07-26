@@ -163,7 +163,7 @@ namespace Atom.Core
             _destEndPoint = new AtomEndPoint(IPAddress.Parse(address), port);
             while (true)
             {
-                if (_id != 0) AtomTime.MessagesSent++;
+                if (_id != 0) AtomTime.AddSent();
                 using (AtomStream message = AtomStream.Get())
                 {
                     message.Write((byte)Message.ConnectAndPing);
@@ -241,8 +241,8 @@ namespace Atom.Core
                                 Send(playerId);
                                 reader.Read(out double timeOfClient);
                                 reader.Read(out double timeOfServer);
-                                AtomTime.GetNetworkTime(timeOfClient, timeOfServer);
-                                AtomTime.ReceivedMessages++;
+                                AtomTime.SetTime(timeOfClient, timeOfServer);
+                                AtomTime.AddReceived();
                             }
                         }
                     }

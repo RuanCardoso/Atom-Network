@@ -21,8 +21,8 @@ namespace Atom.Core
     public class AtomBandwidth
     {
         private readonly Stopwatch _stopwatch = new();
-        private long _totalMessages;
         private double _lastSec;
+        private long _totalMessages;
         private long _totalBytes;
 
         public void Start() // Before we receive the data, let's start the stopwatch.
@@ -51,12 +51,14 @@ namespace Atom.Core
             {
                 double bytesTransferRate = _totalBytes / seconds;
                 double packetsTransferRate = Math.Round(_totalMessages / seconds);
+
                 if (seconds >= _lastSec + 1)
                 {
                     bytesRate = (int)bytesTransferRate;
                     messageRate = (int)packetsTransferRate;
                     _lastSec = seconds;
                 }
+
                 if (seconds >= 5.016)
                 {
                     _lastSec = _totalBytes = _totalMessages = 0;
