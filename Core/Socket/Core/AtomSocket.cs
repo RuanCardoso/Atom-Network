@@ -469,118 +469,118 @@ namespace Atom.Core
 #endif
 #endif
                             int playerId = 0;
-                            using (AtomStream atomStream = AtomStream.Get())
-                            {
-                                atomStream.SetBuffer(buffer, 0, bytesTransferred);
-                                atomStream.Read(out byte header);
+                            using AtomStream message = AtomStream.Get();
+                            message.SetBuffer(buffer, 0, bytesTransferred);
+                            message.Read(out byte header);
 #if ATOM_BYTE_PLAYER_ID
-                                atomStream.Read(out byte _playerId);
-                                playerId = _playerId;
+                            message.Read(out byte _playerId);
+                            playerId = _playerId;
 #elif ATOM_USHORT_PLAYER_ID
-                                atomStream.Read(out ushort _playerId);
-                                playerId = _playerId;
+                            atomStream.Read(out ushort _playerId);
+                            playerId = _playerId;
 #elif ATOM_INT_PLAYER_ID
-                                atomStream.Read(out int _playerId);
-                                playerId = _playerId;
+                            atomStream.Read(out int _playerId);
+                            playerId = _playerId;
 #endif
-                                Channel channelMode = (Channel)(byte)(header & AtomCore.CHANNEL_MASK);
-                                Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TARGET_MASK);
-                                Operation opMode = (Operation)(byte)((header >> 5) & AtomCore.OPERATION_MASK);
+                            Channel channelMode = (Channel)(byte)(header & AtomCore.CHANNEL_MASK);
+                            Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TARGET_MASK);
+                            Operation opMode = (Operation)(byte)((header >> 5) & AtomCore.OPERATION_MASK);
 #if ATOM_DEBUG
-                                if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
-                                    throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
+                            if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
+                                throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
 #endif
-                                switch (channelMode)
-                                {
-                                    case Channel.Reliable:
-                                    case Channel.ReliableAndOrderly:
+                            switch (channelMode)
+                            {
+                                case Channel.Reliable:
+                                case Channel.ReliableAndOrderly:
+                                    {
+                                        AtomChannel channel = _channels[(playerId, (byte)channelMode)];
+                                        message.Read(out int seqAck);
+                                        if (opMode == Operation.Acknowledgement)
                                         {
-                                            AtomChannel channel = _channels[(playerId, (byte)channelMode)];
-                                            atomStream.Read(out int seqAck);
-                                            if (opMode == Operation.Acknowledgement)
+                                            if (!IsServer)
                                             {
-                                                if (!IsServer)
-                                                {
-                                                    if (!channel.MessagesToRelay.TryRemove((seqAck, playerId), out _))
-                                                        AtomLogger.PrintError($"[Atom] -> Receive -> The acknowledgement message is not found -> {IsServer}");
-                                                }
-                                                else
-                                                {
-                                                    AtomClient peer = _clientsById[playerId];
-                                                    AtomClient otherPeer = _clientsByEndPoint[_peerEndPoint];
-                                                    int peerId = (peer.Id != otherPeer.Id) ? otherPeer.Id : playerId;
-                                                    if (!channel.MessagesToRelay.TryRemove((seqAck, peerId), out _))
-                                                        AtomLogger.PrintError($"[Atom] -> Receive -> The acknowledgement message is not found -> {IsServer}");
-                                                }
+                                                if (!channel.MessagesToRelay.TryRemove((seqAck, playerId), out _))
+                                                    AtomLogger.PrintError($"[Atom] -> Receive -> The acknowledgement message is not found -> {IsServer}");
                                             }
                                             else
                                             {
-                                                byte[] data = atomStream.ReadNext(out int length);
-                                                using (AtomStream ackStream = AtomStream.Get())
-                                                    Send(ackStream, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
+                                                AtomClient peer = _clientsById[playerId];
+                                                AtomClient otherPeer = _clientsByEndPoint[_peerEndPoint];
+                                                int peerId = (peer.Id != otherPeer.Id) ? otherPeer.Id : playerId;
+                                                if (!channel.MessagesToRelay.TryRemove((seqAck, peerId), out _))
+                                                    AtomLogger.PrintError($"[Atom] -> Receive -> The acknowledgement message is not found -> {IsServer}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            byte[] data = message.ReadNext(out int length);
+                                            AtomStream ackStream = AtomStream.Get();
+                                            Send(ackStream, channelMode, Target.Single, Operation.Acknowledgement, playerId, _peerEndPoint, seqAck);
+                                            ackStream.Dispose();
 
-                                                switch (channelMode)
-                                                {
-                                                    case Channel.Reliable:
+                                            switch (channelMode)
+                                            {
+                                                case Channel.Reliable:
+                                                    {
+                                                        if (!channel.Acks.Add(seqAck))
+                                                            continue;
+
+                                                        internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                        break;
+                                                    }
+
+                                                case Channel.ReliableAndOrderly:
+                                                    {
+                                                        if (seqAck < channel.ExpectedAck)
+                                                            continue;
+                                                        if (!channel.Acks.Add(seqAck))
+                                                            continue;
+
+                                                        byte[] _data_ = data.ToArray();
+                                                        int min = channel.Acks.Min();
+                                                        int max = channel.Acks.Max();
+                                                        channel.SequentialData.Add(seqAck, _data_);
+                                                        if (min == channel.ExpectedAck)
                                                         {
-                                                            if (!channel.Acks.Add(seqAck))
-                                                                continue;
-
-                                                            internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
-                                                            break;
-                                                        }
-
-                                                    case Channel.ReliableAndOrderly:
-                                                        {
-                                                            if (seqAck < channel.ExpectedAck)
-                                                                continue;
-                                                            if (!channel.Acks.Add(seqAck))
-                                                                continue;
-
-                                                            byte[] _data_ = data.ToArray();
-                                                            int min = channel.Acks.Min();
-                                                            int max = channel.Acks.Max();
-                                                            channel.SequentialData.Add(seqAck, _data_);
-                                                            if (min == channel.ExpectedAck)
+                                                            int range = max - (min - 1);
+                                                            if (channel.Acks.Count == range)
                                                             {
-                                                                int range = max - (min - 1);
-                                                                if (channel.Acks.Count == range)
-                                                                {
-                                                                    foreach (var (key, value) in channel.SequentialData)
-                                                                        internal_Send(value, value.Length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                                foreach (var (key, value) in channel.SequentialData)
+                                                                    internal_Send(value, value.Length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
 
-                                                                    channel.ExpectedAck = max + 1;
-                                                                    channel.Acks.Clear();
-                                                                    channel.SequentialData.Clear();
-                                                                }
-                                                                else { /* Get missing messages  */}
+                                                                channel.ExpectedAck = max + 1;
+                                                                channel.Acks.Clear();
+                                                                channel.SequentialData.Clear();
                                                             }
                                                             else { /* Get missing messages  */}
-                                                            break;
                                                         }
-                                                }
+                                                        else { /* Get missing messages  */}
+                                                        break;
+                                                    }
                                             }
-
-                                            break;
                                         }
 
-                                    case Channel.Unreliable:
-                                        {
-                                            byte[] data = atomStream.ReadNext(out int length);
-                                            internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
-                                            break;
-                                        }
-                                }
+                                        break;
+                                    }
+
+                                case Channel.Unreliable:
+                                    {
+                                        byte[] data = message.ReadNext(out int length);
+                                        internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                        break;
+                                    }
                             }
                         }
                         else
-                            AtomLogger.PrintError("\r\nReceiveFrom() failed with error code: " + bytesTransferred);
+                            throw new Exception("[Atom] Send -> The bytesTransferred is less than 0.");
                     }
                 }
                 catch (SocketException ex)
                 {
                     if (ex.ErrorCode == 10004)
                         return;
+
                     Debug.LogException(ex);
                 }
                 catch (ThreadAbortException) { }
@@ -596,6 +596,8 @@ namespace Atom.Core
             }.Start();
         }
 
+        public Socket GetSocket() => _socket;
+        private void ReturnId(int id) => _ids.Push(id, true);
         private bool GetAvailableId(out int id)
         {
             id = 0;
@@ -604,8 +606,6 @@ namespace Atom.Core
             return id != 0;
         }
 
-        private void ReturnId(int id) => _ids.Push(id, true);
-        public Socket GetSocket() => _socket;
         public void Close()
         {
             try
