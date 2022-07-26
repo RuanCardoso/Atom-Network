@@ -417,6 +417,18 @@ namespace Atom.Core
         {
             new Thread(() =>
             {
+                void internal_Send(ReadOnlySpan<byte> data, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
+                {
+                    using (AtomStream reader = AtomStream.Get())
+                    {
+                        using (AtomStream writer = AtomStream.Get())
+                        {
+                            reader.SetBuffer(data);
+                            OnMessageCompleted(reader, writer, playerId, endPoint, channel, target, operation, IsServer);
+                        }
+                    }
+                }
+
                 try
                 {
 #if ATOM_BANDWIDTH_COUNTER
@@ -513,55 +525,36 @@ namespace Atom.Core
                                                             if (!channel.Acknowledgements.Add(seqAck))
                                                                 continue;
 
-                                                            //if()
-
-                                                            using (AtomStream reader = AtomStream.Get())
-                                                            {
-                                                                using (AtomStream writer = AtomStream.Get())
-                                                                {
-                                                                    reader.SetBuffer(data);
-                                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
-                                                                }
-                                                            }
-
+                                                            internal_Send(data, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                             break;
                                                         }
 
                                                     case Channel.ReliableAndOrderly:
                                                         {
-                                                            if (seqAck <= channel.LastProcessedSequentialAck)
+                                                            if (!channel.Acknowledgements.Add(seqAck))
                                                                 continue;
 
-                                                            if (channel.SequentialData.ContainsKey(seqAck))
+                                                            byte[] _data_ = data.ToArray();
+                                                            int minAck = channel.Acknowledgements.Min();
+                                                            int maxAck = channel.Acknowledgements.Max();
+                                                            channel.SequentialData.Add(seqAck, _data_);
+                                                            if (minAck == channel.ExpectedAcknowledgement)
                                                             {
-                                                                channel.SequentialData.Add(seqAck, data.ToArray());
-                                                                if (channel.IsSequential())
+                                                                int range = maxAck - (minAck - 1);
+                                                                if (channel.Acknowledgements.Count == range)
                                                                 {
-                                                                    var KvPSenquentialData = channel.SequentialData.ToList();
-                                                                    for (int i = 0; i < KvPSenquentialData.Count; i++)
+                                                                    foreach (var (key, value) in channel.SequentialData)
                                                                     {
-                                                                        var KvP = KvPSenquentialData[i];
-                                                                        if (KvP.Key > channel.LastProcessedSequentialAck)
-                                                                        {
-                                                                            using (AtomStream reader = AtomStream.Get())
-                                                                            {
-                                                                                using (AtomStream writer = AtomStream.Get())
-                                                                                {
-                                                                                    reader.SetBuffer(KvP.Value);
-                                                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
-                                                                                }
-                                                                            }
-                                                                            channel.LastProcessedSequentialAck++;
-                                                                        }
-                                                                        else
-                                                                            channel.SequentialData.Remove(KvP.Key);
+                                                                        internal_Send(value, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                                     }
-                                                                    channel.LastReceivedSequentialAck = KvPSenquentialData.Last().Key;
-                                                                }
-                                                                else {/*Waiting for more packets, to create the sequence*/}
-                                                            }
-                                                            else {/*Discard duplicate packet....*/}
 
+                                                                    channel.ExpectedAcknowledgement = maxAck + 1;
+                                                                    channel.Acknowledgements.Clear();
+                                                                    channel.SequentialData.Clear();
+                                                                }
+                                                                else { /* Get missing messages  */}
+                                                            }
+                                                            else { /* Get missing messages  */}
                                                             break;
                                                         }
                                                 }
@@ -573,15 +566,7 @@ namespace Atom.Core
                                     case Channel.Unreliable:
                                         {
                                             ReadOnlySpan<byte> data = atomStream.ReadNext();
-                                            using (AtomStream reader = AtomStream.Get())
-                                            {
-                                                using (AtomStream writer = AtomStream.Get())
-                                                {
-                                                    reader.SetBuffer(data);
-                                                    OnMessageCompleted(reader, writer, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
-                                                }
-                                            }
-
+                                            internal_Send(data, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                             break;
                                         }
                                 }
