@@ -124,14 +124,17 @@ namespace Atom.Core
                 ReceiveBufferSize = AtomGlobal.Settings.MaxRecBuffer,
                 SendBufferSize = AtomGlobal.Settings.MaxSendBuffer,
             };
-
             // Bind the endepoint.
             _socket.Bind(endPoint);
             _cancelTokenSource = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
-            for (int i = 1; i < AtomGlobal.Settings.MaxPlayers; i++)
-                _ids.Push(i, false);
+            for (int id = 1; id <= AtomGlobal.Settings.MaxPlayers; id++)
+            {
+                _ids.Push(id, false);
+                // Pre-alloc memory!
+                AddChannel(id);
+            }
             _ids.Sort();
         }
 
@@ -187,12 +190,7 @@ namespace Atom.Core
                         {
                             if (playerId == 0)
                             {
-                                if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _))
-                                {
-                                    RemoveChannel(socketClient.Id);
-                                    ReturnId(socketClient.Id);
-                                }
-
+                                if (_clientsByEndPoint.TryRemove(endPoint, out AtomClient socketClient) && _clientsById.TryRemove(socketClient.Id, out _)) ReturnId(socketClient.Id);
                                 if (GetAvailableId(out int id))
                                 {
                                     if (endPoint is AtomEndPoint _endPoint)
@@ -202,7 +200,6 @@ namespace Atom.Core
                                         AtomClient client = new(id, address, port);
                                         if (_clientsByEndPoint.TryAdd(client.EndPoint, client) && _clientsById.TryAdd(id, client))
                                         {
-                                            AddChannel(id);
                                             writer.Write((byte)Message.ConnectAndPing);
                                             writer.Write(id);
                                             SendToClient(writer, channelMode, targetMode, opMode, id);
@@ -230,11 +227,7 @@ namespace Atom.Core
                         else if (!isServer)
                         {
                             if (_id == 0)
-                            {
                                 _id.Read(reader);
-                                for (int i = 0; i < AtomGlobal.Settings.MaxPlayers; i++)
-                                    AddChannel(i);
-                            }
                             else
                             {
                                 Relay(playerId);
@@ -261,18 +254,11 @@ namespace Atom.Core
             for (int i = 0; i < _channelModes.Length; i++)
             {
                 Channel channelMode = _channelModes[i];
-                if (!_channels.TryAdd((playerId, (byte)channelMode), new AtomChannel()))
-                    AtomLogger.PrintError($"Channel {channelMode} already exists!");
-            }
-        }
-
-        private void RemoveChannel(int playerId)
-        {
-            for (int i = 0; i < _channelModes.Length; i++)
-            {
-                Channel channelMode = _channelModes[i];
-                if (!_channels.TryRemove((playerId, (byte)channelMode), out _))
-                    AtomLogger.PrintError($"Channel {channelMode} not found!");
+                if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
+                {
+                    if (!_channels.TryAdd((playerId, (byte)channelMode), new AtomChannel()))
+                        AtomLogger.PrintError($"Channel {channelMode} already exists!");
+                }
             }
         }
 
@@ -347,11 +333,14 @@ namespace Atom.Core
             for (int i = 0; i < _channelModes.Length; i++)
             {
                 Channel channel = _channelModes[i];
-                var messages = _channels[(playerId, (byte)channel)].MessagesToRelay.Values.ToList();
-                for (int y = 0; y < messages.Count; y++)
+                if (channel == Channel.Reliable || channel == Channel.ReliableAndOrderly)
                 {
-                    var relayMessage = messages[y];
-                    Send(isRelay: true, data: relayMessage.Data, length: relayMessage.Data.Length, endPoint: relayMessage.EndPoint, target: Target.Single, playerId: relayMessage.Id);
+                    var messages = _channels[(playerId, (byte)channel)].MessagesToRelay.Values.ToList();
+                    for (int y = 0; y < messages.Count; y++)
+                    {
+                        var relayMessage = messages[y];
+                        Send(isRelay: true, data: relayMessage.Data, length: relayMessage.Data.Length, endPoint: relayMessage.EndPoint, target: Target.Single, playerId: relayMessage.Id);
+                    }
                 }
             }
         }
@@ -410,7 +399,7 @@ namespace Atom.Core
             }
             else
             {
-                if (!isRelay) CreateRelayMessage(playerId, endPoint);
+                //if (!isRelay) CreateRelayMessage(playerId, endPoint);
                 sendTo = _socket.SendTo(data, length, SocketFlags.None, endPoint);
             }
 
