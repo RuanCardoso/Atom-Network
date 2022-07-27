@@ -13,6 +13,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Objects;
 using System;
 using System.Diagnostics;
 
@@ -20,51 +21,18 @@ namespace Atom.Core
 {
     public class AtomBandwidth
     {
-        private readonly Stopwatch _stopwatch = new();
-        private double _lastSec;
-        private long _totalMessages;
-        private long _totalBytes;
+        private double _localTime;
+        private double _totalMessages;
+        private double _bytesTransferred;
+        public double TotalMessages => Math.Round(_totalMessages / (AtomTime.LocalTime - _localTime));
+        public double BytesTransferred => Math.Round(_bytesTransferred / (AtomTime.LocalTime - _localTime));
 
-        public void Start() // Before we receive the data, let's start the stopwatch.
+        public void Add(int bytesTransferred, double localTime)
         {
-            if (!_stopwatch.IsRunning)
-                _stopwatch.Start();
-        }
-
-        public void Stop() // After we receive the data, stop the stopwatch.
-        {
-            if (_stopwatch.IsRunning)
-                _stopwatch.Stop();
-        }
-
-        public void Add(int bytesTransferred)
-        {
+            if (_localTime == 0)
+                _localTime = localTime;
             _totalMessages++;
-            _totalBytes += bytesTransferred;
-        }
-
-        public void Get(out int bytesRate, out int messageRate)
-        {
-            bytesRate = messageRate = 0;
-            double seconds = _stopwatch.Elapsed.TotalSeconds;
-            if (seconds > 0)
-            {
-                double bytesTransferRate = _totalBytes / seconds;
-                double packetsTransferRate = Math.Round(_totalMessages / seconds);
-
-                if (seconds >= _lastSec + 1)
-                {
-                    bytesRate = (int)bytesTransferRate;
-                    messageRate = (int)packetsTransferRate;
-                    _lastSec = seconds;
-                }
-
-                if (seconds >= 5.016)
-                {
-                    _lastSec = _totalBytes = _totalMessages = 0;
-                    _stopwatch.Reset();
-                }
-            }
+            _bytesTransferred += bytesTransferred;
         }
     }
 }

@@ -17,6 +17,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -25,7 +26,7 @@ namespace Atom.Core
     public class AtomChannel
     {
         public int SentAck = 0;
-        public ConcurrentDictionary<(int, int), AtomRelayMessage> MessagesToRelay = new();
+        public ConcurrentDictionary<(int, int), Action> MessagesToRelay = new();
         public HashSet<int> Acks = new();
         public SortedDictionary<int, byte[]> SequentialData = new();
         public int ExpectedAck { get; set; } = 1;
