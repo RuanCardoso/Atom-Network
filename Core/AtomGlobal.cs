@@ -70,6 +70,8 @@ namespace Atom.Core
             {
                 _AOT_ = AtomHelper.AOT();
 #if UNITY_EDITOR
+                if (!Directory.Exists(RES_PATH))
+                    Directory.CreateDirectory(RES_PATH);
                 CreateSettingsFile();
                 CreateFileWatcher(RES_PATH);
 #else
@@ -81,7 +83,6 @@ namespace Atom.Core
 #if UNITY_EDITOR
         private static void CreateSettingsFile()
         {
-            if (!Directory.Exists(RES_PATH)) Directory.CreateDirectory(RES_PATH);
             if (!File.Exists(PATH))
                 SaveSettingsFile();
             else
@@ -90,8 +91,11 @@ namespace Atom.Core
 
         public static void SaveSettingsFile()
         {
-            using TextWriter strFile = File.CreateText(PATH);
-            MessagePackSerializer.SerializeToJson(strFile, Settings);
+            if (Directory.Exists(RES_PATH))
+            {
+                using TextWriter strFile = File.CreateText(PATH);
+                MessagePackSerializer.SerializeToJson(strFile, Settings);
+            }
         }
 #endif
 
