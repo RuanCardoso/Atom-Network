@@ -70,8 +70,8 @@ namespace Atom.Core
             {
                 _AOT_ = AtomHelper.AOT();
 #if UNITY_EDITOR
-                CreateFileWatcher(RES_PATH);
                 CreateSettingsFile();
+                CreateFileWatcher(RES_PATH);
 #else
                 _INIT_ = true;
 #endif
