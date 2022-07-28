@@ -20,7 +20,7 @@ using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-namespace Atom.Core
+namespace Atom.Core.Editor
 {
     public static class AtomLoad
     {

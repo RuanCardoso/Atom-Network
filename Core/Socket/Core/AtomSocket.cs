@@ -48,8 +48,9 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
+using static Atom.Core.AtomCore;
+using static Atom.Core.AtomGlobal;
 using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace Atom.Core
@@ -122,15 +123,15 @@ namespace Atom.Core
         {
             _socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
             {
-                ReceiveBufferSize = AtomGlobal.Settings.MaxRecBuffer,
-                SendBufferSize = AtomGlobal.Settings.MaxSendBuffer,
+                ReceiveBufferSize = Settings.MaxRecBuffer,
+                SendBufferSize = Settings.MaxSendBuffer,
             };
             // Bind the endepoint.
             _socket.Bind(endPoint);
             _cancelTokenSource = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
-            for (int id = 1; id <= AtomGlobal.Settings.MaxPlayers; id++)
+            for (int id = 1; id <= Settings.MaxPlayers; id++)
             {
                 _ids.Push(id, false);
                 // Pre-alloc memory!
@@ -289,7 +290,7 @@ namespace Atom.Core
         private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, int playerId, int seqAck = 0)
         {
             var data = messageStream.GetBuffer();
-            int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? AtomCore.RELIABLE_SIZE : AtomCore.UNRELIABLE_SIZE;
+            int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? RELIABLE_SIZE : UNRELIABLE_SIZE;
 #if ATOM_DEBUG
             if (messageStream.FixedSize)
             {
@@ -302,7 +303,7 @@ namespace Atom.Core
             messageStream.Write(data, 0, countBytes);
             messageStream.Position = 0;
 #if ATOM_DEBUG
-            if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
+            if (((byte)channelMode) > CHANNEL_MASK || ((byte)targetMode) > TARGET_MASK || ((byte)opMode) > OPERATION_MASK)
                 throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
 #endif
             byte header = (byte)((byte)channelMode | (byte)targetMode << 2 | (byte)opMode << 5);
@@ -421,7 +422,20 @@ namespace Atom.Core
                                 Console.WriteLine($"Avg: Rec {bytesTransferred} bytes, {bytesRate} bytes/s, {messageRate} messages/s");
 #else
                             if (bandwidthCounter.TotalMessages > 0)
-                                Debug.LogFormat(LogType.Error, LogOption.NoStacktrace, null, "Avg: Rec {0} bytes | {1} bytes/s | {2} messages/s", bytesTransferred, bandwidthCounter.BytesTransferred, bandwidthCounter.TotalMessages);
+                            {
+#if UNITY_EDITOR
+                                if (IsServer)
+                                {
+                                    Module.SERVER_REC_BYTES_RATE = $"{bandwidthCounter.BytesTransferred} bytes/s";
+                                    Module.SERVER_REC_MSG_RATE = $"{bandwidthCounter.TotalMessages} messages/s";
+                                }
+                                else
+                                {
+                                    Module.CLIENT_REC_BYTES_RATE = $"{bandwidthCounter.BytesTransferred} bytes/s";
+                                    Module.CLIENT_REC_MSG_RATE = $"{bandwidthCounter.TotalMessages} messages/s";
+                                }
+#endif
+                            }
 #endif
 #endif
                             int playerId = 0;
@@ -438,11 +452,11 @@ namespace Atom.Core
                             atomStream.Read(out int _playerId);
                             playerId = _playerId;
 #endif
-                            Channel channelMode = (Channel)(byte)(header & AtomCore.CHANNEL_MASK);
-                            Target targetMode = (Target)(byte)((header >> 2) & AtomCore.TARGET_MASK);
-                            Operation opMode = (Operation)(byte)((header >> 5) & AtomCore.OPERATION_MASK);
+                            Channel channelMode = (Channel)(byte)(header & CHANNEL_MASK);
+                            Target targetMode = (Target)(byte)((header >> 2) & TARGET_MASK);
+                            Operation opMode = (Operation)(byte)((header >> 5) & OPERATION_MASK);
 #if ATOM_DEBUG
-                            if (((byte)channelMode) > AtomCore.CHANNEL_MASK || ((byte)targetMode) > AtomCore.TARGET_MASK || ((byte)opMode) > AtomCore.OPERATION_MASK)
+                            if (((byte)channelMode) > CHANNEL_MASK || ((byte)targetMode) > TARGET_MASK || ((byte)opMode) > OPERATION_MASK)
                                 throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
 #endif
                             switch (channelMode)

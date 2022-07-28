@@ -385,13 +385,13 @@ namespace Atom.Core.Wrappers
             else
             {
                 Reset();
-                AtomCore.StreamPool.Push(this);
+                AtomCore.Streams.Push(this);
             }
         }
 
         public static AtomStream Get()
         {
-            var atomStream = AtomCore.StreamPool.Pull();
+            var atomStream = AtomCore.Streams.Pull();
 #if ATOM_DEBUG
             return atomStream._countBytes != 0
                 ? throw new Exception("AtomStream: A item has been modified while it was in the pool!")

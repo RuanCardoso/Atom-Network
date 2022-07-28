@@ -60,8 +60,8 @@ namespace Atom.Core
         private static bool _INIT_;
 
         public static ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Create();
-        public static Encoding Encoding;
-        public static AtomSettings Settings;
+        public static Encoding Encoding { get; private set; }
+        public static AtomSettings Settings { get; private set; } = new();
 
         static AtomGlobal()
         {
@@ -82,14 +82,15 @@ namespace Atom.Core
         {
             if (!Directory.Exists(RES_PATH)) Directory.CreateDirectory(RES_PATH);
             if (!File.Exists(PATH))
-            {
-                using (TextWriter strFile = File.CreateText(PATH))
-                {
-                    MessagePackSerializer.SerializeToJson(strFile, new AtomSettings());
-                }
-            }
+                SaveSettingsFile();
             else
                 _INIT_ = true;
+        }
+
+        public static void SaveSettingsFile()
+        {
+            using TextWriter strFile = File.CreateText(PATH);
+            MessagePackSerializer.SerializeToJson(strFile, Settings);
         }
 #endif
 

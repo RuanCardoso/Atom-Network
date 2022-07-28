@@ -13,8 +13,11 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Attribute;
 using Atom.Core.Wrappers;
+using MarkupAttributes;
 using UnityEngine;
+using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core
 {
@@ -34,27 +37,47 @@ namespace Atom.Core
         public const int RELIABLE_SIZE = 9;
         public const int UNRELIABLE_SIZE = 5;
 #endif
-        public static AtomPooling<AtomStream> StreamPool { get; private set; }
+        public static AtomCore Module { get; private set; }
+        public static AtomPooling<AtomStream> Streams { get; private set; }
         public static double NetworkTime { get; private set; }
 
+#if UNITY_EDITOR
+        [Box("Bandwidth")]
+        [Box("Bandwidth/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
+        [Label("Message Rate")][ReadOnly] public string SERVER_REC_MSG_RATE = "0 Bytes/s";
+        [Box("Bandwidth/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
+        [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
+        [Box("Settings")]
+        public BuildMode Build = BuildMode.Debug;
+        public EncodingType Encoding = EncodingType.ASCII;
+        [Label("Max Message Size")] public int MaxUdpMessageSize = 8192;
+#endif
         private void Awake()
         {
+            Module = this;
             NetworkTime = Time.timeAsDouble;
-            AtomGlobal.LoadSettingsFile();
-            {
-                StreamPool = new(() => new(true, false, false), AtomGlobal.Settings.MaxStreamPool, false, true, "AtomStreamPool");
-            }
+            LoadSettingsFile();
+            Streams = new(() => new(true, false, false), Settings.MaxStreamPool, false, true, "AtomStreamPool");
         }
 
         private void Start()
         {
             NetworkTime = Time.timeAsDouble;
-            Application.targetFrameRate = 60;
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = 256;
         }
 
         private void Update()
         {
             NetworkTime = Time.timeAsDouble;
+        }
+
+        private void OnValidate()
+        {
+            bool isSave = Settings.DebugMode != Build.ToString();
+            Settings.DebugMode = Build.ToString();
+            if (isSave)
+                SaveSettingsFile();
         }
     }
 }
