@@ -35,15 +35,15 @@ namespace Atom.Core
         [Key("encoding")]
         public string Encoding = "ASCII";
         [Key("max_udp_packet_size")]
-        public int MaxUdpPacketSize = 255;
+        public int MaxUdpPacketSize = 128;
         [Key("max_players")]
-        public int MaxPlayers = 255;
+        public int MaxPlayers = 12;
         [Key("max_rec_buffer")]
-        public int MaxRecBuffer = 8192;
+        public int MaxRecBuffer = 1024;
         [Key("max_send_buffer")]
-        public int MaxSendBuffer = 8192;
+        public int MaxSendBuffer = 1024;
         [Key("max_stream_pool")]
-        public int MaxStreamPool = 10;
+        public int MaxStreamPool = 12;
         [Key("bandwidth_counter")]
         public bool BandwidthCounter = true;
         [Key("incremental_gc")]
