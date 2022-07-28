@@ -124,7 +124,9 @@ namespace Atom.Core
             _socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
             {
                 ReceiveBufferSize = Settings.MaxRecBuffer,
+                ReceiveTimeout = 0,
                 SendBufferSize = Settings.MaxSendBuffer,
+                SendTimeout = 0,
             };
             // Bind the endepoint.
             _socket.Bind(endPoint);
@@ -414,14 +416,12 @@ namespace Atom.Core
                         if (bytesTransferred >= 0)
                         {
 #if ATOM_BANDWIDTH_COUNTER
-                            //bandwidthCounter.Stop();
                             bandwidthCounter.Add(bytesTransferred, AtomTime.LocalTime);
-                            //bandwidthCounter.Get(out int bytesRate, out double messageRate);
 #if UNITY_SERVER
                             if (bytesRate > 0 && messageRate > 0)
                                 Console.WriteLine($"Avg: Rec {bytesTransferred} bytes, {bytesRate} bytes/s, {messageRate} messages/s");
 #else
-                            if (bandwidthCounter.TotalMessages > 0)
+                            if (bandwidthCounter.TotalMessages > 0 && !double.IsInfinity(bandwidthCounter.TotalMessages))
                             {
 #if UNITY_EDITOR
                                 if (IsServer)

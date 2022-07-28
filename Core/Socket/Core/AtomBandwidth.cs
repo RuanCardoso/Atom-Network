@@ -13,9 +13,8 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
-using Atom.Core.Objects;
 using System;
-using System.Diagnostics;
+using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core
 {
@@ -24,15 +23,24 @@ namespace Atom.Core
         private double _localTime;
         private double _totalMessages;
         private double _bytesTransferred;
-        public double TotalMessages => Math.Round(_totalMessages / (AtomTime.LocalTime - _localTime));
-        public double BytesTransferred => Math.Round(_bytesTransferred / (AtomTime.LocalTime - _localTime));
+        public double TotalMessages => Math.Round(_totalMessages / (AtomTime.LocalTime - _localTime), MidpointRounding.AwayFromZero);
+        public double BytesTransferred => Math.Round(_bytesTransferred / (AtomTime.LocalTime - _localTime), MidpointRounding.AwayFromZero);
 
         public void Add(int bytesTransferred, double localTime)
         {
-            if (_localTime == 0)
-                _localTime = localTime;
             _totalMessages++;
             _bytesTransferred += bytesTransferred;
+            if (_localTime == 0)
+                _localTime = localTime;
+            else
+            {
+                double time = localTime - _localTime;
+                if (time >= Settings.BandwidthTimeout)
+                {
+                    _totalMessages = _bytesTransferred = 0;
+                    _localTime = localTime;
+                }
+            }
         }
     }
 }

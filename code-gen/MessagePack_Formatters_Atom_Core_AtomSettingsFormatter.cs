@@ -32,6 +32,8 @@ namespace MessagePack.Formatters.Atom.Core
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxSendBuffer() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 101, 110, 100, 95, 98, 117, 102, 102, 101, 114 };
         // max_stream_pool
         private static global::System.ReadOnlySpan<byte> GetSpan_MaxStreamPool() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 116, 114, 101, 97, 109, 95, 112, 111, 111, 108 };
+        // bandwidth_timeout
+        private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthTimeout() => new byte[1 + 17] { 177, 98, 97, 110, 100, 119, 105, 100, 116, 104, 95, 116, 105, 109, 101, 111, 117, 116 };
         // bandwidth_counter
         private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthCounter() => new byte[1 + 17] { 177, 98, 97, 110, 100, 119, 105, 100, 116, 104, 95, 99, 111, 117, 110, 116, 101, 114 };
         // incremental_gc
@@ -46,7 +48,7 @@ namespace MessagePack.Formatters.Atom.Core
             }
 
             var formatterResolver = options.Resolver;
-            writer.WriteMapHeader(9);
+            writer.WriteMapHeader(10);
             writer.WriteRaw(GetSpan_DebugMode());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.DebugMode, options);
             writer.WriteRaw(GetSpan_Encoding());
@@ -61,6 +63,8 @@ namespace MessagePack.Formatters.Atom.Core
             writer.Write(value.MaxSendBuffer);
             writer.WriteRaw(GetSpan_MaxStreamPool());
             writer.Write(value.MaxStreamPool);
+            writer.WriteRaw(GetSpan_BandwidthTimeout());
+            writer.Write(value.BandwidthTimeout);
             writer.WriteRaw(GetSpan_BandwidthCounter());
             writer.Write(value.BandwidthCounter);
             writer.WriteRaw(GetSpan_IncrementalGc());
@@ -143,10 +147,28 @@ namespace MessagePack.Formatters.Atom.Core
 
                         }
                     case 17:
-                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_BandwidthCounter().Slice(1))) { goto FAIL; }
+                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                        {
+                            default: goto FAIL;
+                            case 8386944367577686370UL:
+                                switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                                {
+                                    default: goto FAIL;
+                                    case 8462093745447526248UL:
+                                        if (stringKey[0] != 116) { goto FAIL; }
 
-                        ____result.BandwidthCounter = reader.ReadBoolean();
-                        continue;
+                                        ____result.BandwidthTimeout = reader.ReadInt32();
+                                        continue;
+
+                                    case 7310589545788170088UL:
+                                        if (stringKey[0] != 114) { goto FAIL; }
+
+                                        ____result.BandwidthCounter = reader.ReadBoolean();
+                                        continue;
+
+                                }
+
+                        }
 
                 }
             }

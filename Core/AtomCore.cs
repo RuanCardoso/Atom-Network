@@ -43,18 +43,21 @@ namespace Atom.Core
         public static double NetworkTime { get; private set; }
 
 #if UNITY_EDITOR
+#if ATOM_BANDWIDTH_COUNTER
         [Box("Bandwidth")]
+        [Label("Timeout")] public int BandwidthTimeout;
         [Box("Bandwidth/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string SERVER_REC_MSG_RATE = "0 Bytes/s";
         [Box("Bandwidth/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
+#endif
         [Box("Settings")]
         public BuildMode Build;
         public EncodingType Encoding;
-        [Label("Max Message Size")][Range(1, 1532)] public int MaxUdpMessageSize;
-        [Range(1, MAX_PLAYERS)] public int MaxPlayers;
-        [NaughtyAttributes.InfoBox("ddd", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
-        [NaughtyAttributes.InfoBox("dddaaaaadddddddddddddddaaaaa", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Buffer")] public int MaxSendBuffer;
+        [Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
+        [Range(1, MAX_PLAYERS)][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)][Label("Receive Size")] public int MaxPlayers;
+        [NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
+        [NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
         [Range(1, 128)] public int MaxStreamPool;
         public bool BandwidthCounter;
         [Label("GC Incremental")] public bool IncrementalGc;
@@ -93,6 +96,7 @@ namespace Atom.Core
                     || Settings.MaxSendBuffer != MaxSendBuffer
                     || Settings.MaxStreamPool != MaxStreamPool
                     || Settings.BandwidthCounter != BandwidthCounter
+                    || Settings.BandwidthCounter != BandwidthCounter
                     || Settings.IncrementalGc != IncrementalGc;
                 if (isSave)
                 {
@@ -104,6 +108,7 @@ namespace Atom.Core
                     Settings.MaxRecBuffer = MaxRecBuffer;
                     Settings.MaxSendBuffer = MaxSendBuffer;
                     Settings.MaxStreamPool = MaxStreamPool;
+                    Settings.BandwidthTimeout = BandwidthTimeout;
                     Settings.BandwidthCounter = BandwidthCounter;
                     Settings.IncrementalGc = IncrementalGc;
                     SaveSettingsFile();
@@ -124,6 +129,7 @@ namespace Atom.Core
             MaxRecBuffer = Settings.MaxRecBuffer;
             MaxSendBuffer = Settings.MaxSendBuffer;
             MaxStreamPool = Settings.MaxStreamPool;
+            BandwidthTimeout = Settings.BandwidthTimeout;
             BandwidthCounter = Settings.BandwidthCounter;
             IncrementalGc = Settings.IncrementalGc;
         }

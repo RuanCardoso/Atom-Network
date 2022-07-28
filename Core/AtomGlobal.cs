@@ -44,6 +44,8 @@ namespace Atom.Core
         public int MaxSendBuffer = 1024;
         [Key("max_stream_pool")]
         public int MaxStreamPool = 12;
+        [Key("bandwidth_timeout")]
+        public int BandwidthTimeout = 2;
         [Key("bandwidth_counter")]
         public bool BandwidthCounter = true;
         [Key("incremental_gc")]
