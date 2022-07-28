@@ -53,8 +53,8 @@ namespace Atom.Core
         public EncodingType Encoding;
         [Label("Max Message Size")][Range(1, 1532)] public int MaxUdpMessageSize;
         [Range(1, MAX_PLAYERS)] public int MaxPlayers;
-        [Label("Receive Size")] public int MaxRecBuffer;
-        [Label("Receive Buffer")] public int MaxSendBuffer;
+        [NaughtyAttributes.InfoBox("ddd", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
+        [NaughtyAttributes.InfoBox("dddaaaaadddddddddddddddaaaaa", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Buffer")] public int MaxSendBuffer;
         [Range(1, 128)] public int MaxStreamPool;
         public bool BandwidthCounter;
         [Label("GC Incremental")] public bool IncrementalGc;

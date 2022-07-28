@@ -446,10 +446,10 @@ namespace Atom.Core
                             message.Read(out byte _playerId);
                             playerId = _playerId;
 #elif ATOM_USHORT_PLAYER_ID
-                            atomStream.Read(out ushort _playerId);
+                            message.Read(out ushort _playerId);
                             playerId = _playerId;
 #elif ATOM_INT_PLAYER_ID
-                            atomStream.Read(out int _playerId);
+                            message.Read(out int _playerId);
                             playerId = _playerId;
 #endif
                             Channel channelMode = (Channel)(byte)(header & CHANNEL_MASK);
