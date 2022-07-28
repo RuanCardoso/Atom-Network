@@ -12,7 +12,6 @@
     License: Open Source (MIT)
     ===========================================================*/
 
-#if UNITY_EDITOR
 #if UNITY_2021_3_OR_NEWER
 using UnityEngine;
 
@@ -27,5 +26,4 @@ namespace Atom.Core.Attribute
         }
     }
 }
-#endif
 #endif

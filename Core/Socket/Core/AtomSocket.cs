@@ -161,7 +161,7 @@ namespace Atom.Core
             _this.StartCoroutine(ConnectAndPing(address, port));
         }
 
-        private readonly WaitForSeconds _pingWaiter = new(1000f);
+        private readonly WaitForSeconds _pingWaiter = new(1f);
         private IEnumerator ConnectAndPing(string address, int port)
         {
             _destEndPoint = new AtomEndPoint(IPAddress.Parse(address), port);
@@ -409,18 +409,11 @@ namespace Atom.Core
                     byte[] buffer = new byte[1536];
                     while (!_cancelTokenSource.IsCancellationRequested)
                     {
-#if ATOM_BANDWIDTH_COUNTER
-                        //bandwidthCounter.Start(AtomTime.LocalTime);
-#endif
                         int bytesTransferred = _socket.ReceiveFrom(buffer, ref _peerEndPoint);
                         if (bytesTransferred >= 0)
                         {
 #if ATOM_BANDWIDTH_COUNTER
                             bandwidthCounter.Add(bytesTransferred, AtomTime.LocalTime);
-#if UNITY_SERVER
-                            if (bytesRate > 0 && messageRate > 0)
-                                Console.WriteLine($"Avg: Rec {bytesTransferred} bytes, {bytesRate} bytes/s, {messageRate} messages/s");
-#else
                             if (bandwidthCounter.TotalMessages > 0 && !double.IsInfinity(bandwidthCounter.TotalMessages))
                             {
 #if UNITY_EDITOR
@@ -437,7 +430,7 @@ namespace Atom.Core
 #endif
                             }
 #endif
-#endif
+
                             int playerId = 0;
                             using AtomStream message = AtomStream.Get();
                             message.SetBuffer(buffer, 0, bytesTransferred);

@@ -133,7 +133,7 @@ namespace Atom.Core
             BandwidthCounter = Settings.BandwidthCounter;
             IncrementalGc = Settings.IncrementalGc;
         }
-    }
 #endif
+    }
 }
 #endif
