@@ -16,6 +16,7 @@
 using Atom.Core.Attribute;
 using Atom.Core.Wrappers;
 using MarkupAttributes;
+using System;
 using UnityEngine;
 using static Atom.Core.AtomGlobal;
 
@@ -48,9 +49,9 @@ namespace Atom.Core
         [Box("Bandwidth/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
         [Box("Settings")]
-        public BuildMode Build = BuildMode.Debug;
-        public EncodingType Encoding = EncodingType.ASCII;
-        [Label("Max Message Size")] public int MaxUdpMessageSize = 8192;
+        public BuildMode Build;
+        public EncodingType Encoding;
+        [Label("Max Message Size")][Range(1, 1532)] public int MaxUdpMessageSize;
 #endif
         private void Awake()
         {
@@ -64,7 +65,7 @@ namespace Atom.Core
         {
             NetworkTime = Time.timeAsDouble;
             QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = 256;
+            Application.targetFrameRate = 60;
         }
 
         private void Update()
@@ -72,13 +73,35 @@ namespace Atom.Core
             NetworkTime = Time.timeAsDouble;
         }
 
+#if UNITY_EDITOR
         private void OnValidate()
         {
-            bool isSave = Settings.DebugMode != Build.ToString();
-            Settings.DebugMode = Build.ToString();
-            if (isSave)
+            if (!Application.isPlaying)
+            {
+                string _encoding_ = Encoding.ToString().Replace("UTF8", "UTF-8").Replace("UTF16", "UTF-16").Replace("UTF32", "UTF-32");
+                bool isSave = Settings.DebugMode != Build.ToString() || Settings.Encoding != _encoding_ || Settings.MaxUdpPacketSize != MaxUdpMessageSize;
+                if (isSave)
+                {
+                    AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
+                    Settings.DebugMode = Build.ToString();
+                    Settings.Encoding = _encoding_;
+                    Settings.MaxUdpPacketSize = MaxUdpMessageSize;
+                    SaveSettingsFile();
+                }
+            }
+        }
+
+        private void Reset()
+        {
+            if (!Application.isPlaying)
                 SaveSettingsFile();
+
+            AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
+            Build = Enum.Parse<BuildMode>(Settings.DebugMode);
+            Encoding = Enum.Parse<EncodingType>(Settings.Encoding.Replace("UTF-8", "UTF8").Replace("UTF-16", "UTF16").Replace("UTF-32", "UTF32"));
+            MaxUdpMessageSize = Settings.MaxUdpPacketSize;
         }
     }
+#endif
 }
 #endif

@@ -18,6 +18,7 @@ using System;
 using System.Buffers;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -200,7 +201,11 @@ namespace Atom.Core
             watcher.EnableRaisingEvents = true;
         }
 
-        private static void OnChanged(object source, FileSystemEventArgs e) => UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+        private static void OnChanged(object source, FileSystemEventArgs e) => Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+        });
 #endif
     }
 }
