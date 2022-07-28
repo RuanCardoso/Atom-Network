@@ -95,7 +95,7 @@ namespace Atom.Core
                     || Settings.MaxRecBuffer != MaxRecBuffer
                     || Settings.MaxSendBuffer != MaxSendBuffer
                     || Settings.MaxStreamPool != MaxStreamPool
-                    || Settings.BandwidthCounter != BandwidthCounter
+                    || Settings.BandwidthTimeout != BandwidthTimeout
                     || Settings.BandwidthCounter != BandwidthCounter
                     || Settings.IncrementalGc != IncrementalGc;
                 if (isSave)
