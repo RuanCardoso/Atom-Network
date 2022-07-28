@@ -45,7 +45,7 @@ namespace Atom.Core
         [Key("max_stream_pool")]
         public int MaxStreamPool = 12;
         [Key("bandwidth_timeout")]
-        public int BandwidthTimeout = 2;
+        public double BandwidthTimeout = 2;
         [Key("bandwidth_counter")]
         public bool BandwidthCounter = true;
         [Key("incremental_gc")]

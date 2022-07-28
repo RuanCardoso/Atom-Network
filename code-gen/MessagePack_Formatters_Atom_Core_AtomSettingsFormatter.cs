@@ -157,7 +157,7 @@ namespace MessagePack.Formatters.Atom.Core
                                     case 8462093745447526248UL:
                                         if (stringKey[0] != 116) { goto FAIL; }
 
-                                        ____result.BandwidthTimeout = reader.ReadInt32();
+                                        ____result.BandwidthTimeout = reader.ReadDouble();
                                         continue;
 
                                     case 7310589545788170088UL:

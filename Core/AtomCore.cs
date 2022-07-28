@@ -45,7 +45,7 @@ namespace Atom.Core
 #if UNITY_EDITOR
 #if ATOM_BANDWIDTH_COUNTER
         [Box("Bandwidth")]
-        [Label("Timeout")] public int BandwidthTimeout;
+        [Label("Timeout")] public double BandwidthTimeout;
         [Box("Bandwidth/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string SERVER_REC_MSG_RATE = "0 Bytes/s";
         [Box("Bandwidth/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
