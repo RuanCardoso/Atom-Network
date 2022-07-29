@@ -31,7 +31,7 @@ namespace Atom.Core
     public class AtomSettings
     {
         [Key(0)]
-        public string Address = "Debug";
+        public string[] Addresses = new[] { "127.0.0.1:5055", "0.0.0.0:0000" };
         [Key(1)]
         public string DebugMode = "Debug";
         [Key(2)]

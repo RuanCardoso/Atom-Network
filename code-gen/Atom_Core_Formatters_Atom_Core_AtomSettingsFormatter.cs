@@ -18,8 +18,8 @@ namespace Atom.Core.Formatters.Atom.Core
 {
     public sealed class AtomSettingsFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::Atom.Core.AtomSettings>
     {
-        // Address
-        private static global::System.ReadOnlySpan<byte> GetSpan_Address() => new byte[1 + 7] { 167, 65, 100, 100, 114, 101, 115, 115 };
+        // Addresses
+        private static global::System.ReadOnlySpan<byte> GetSpan_Addresses() => new byte[1 + 9] { 169, 65, 100, 100, 114, 101, 115, 115, 101, 115 };
         // DebugMode
         private static global::System.ReadOnlySpan<byte> GetSpan_DebugMode() => new byte[1 + 9] { 169, 68, 101, 98, 117, 103, 77, 111, 100, 101 };
         // Encoding
@@ -57,8 +57,8 @@ namespace Atom.Core.Formatters.Atom.Core
 
             var formatterResolver = options.Resolver;
             writer.WriteMapHeader(14);
-            writer.WriteRaw(GetSpan_Address());
-            global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.Address, options);
+            writer.WriteRaw(GetSpan_Addresses());
+            global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string[]>(formatterResolver).Serialize(ref writer, value.Addresses, options);
             writer.WriteRaw(GetSpan_DebugMode());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.DebugMode, options);
             writer.WriteRaw(GetSpan_Encoding());
@@ -108,16 +108,23 @@ namespace Atom.Core.Formatters.Atom.Core
                     FAIL:
                       reader.Skip();
                       continue;
-                    case 7:
-                        if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 32496501869798465UL) { goto FAIL; }
-
-                        ____result.Address = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Deserialize(ref reader, options);
-                        continue;
                     case 9:
-                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_DebugMode().Slice(1))) { goto FAIL; }
+                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                        {
+                            default: goto FAIL;
+                            case 7310313499700520001UL:
+                                if (stringKey[0] != 115) { goto FAIL; }
 
-                        ____result.DebugMode = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Deserialize(ref reader, options);
-                        continue;
+                                ____result.Addresses = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string[]>(formatterResolver).Deserialize(ref reader, options);
+                                continue;
+
+                            case 7237088232954029380UL:
+                                if (stringKey[0] != 101) { goto FAIL; }
+
+                                ____result.DebugMode = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Deserialize(ref reader, options);
+                                continue;
+
+                        }
                     case 8:
                         if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 7453010313431182917UL) { goto FAIL; }
 

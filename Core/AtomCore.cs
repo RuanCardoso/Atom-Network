@@ -17,12 +17,14 @@ using Atom.Core.Attribute;
 using Atom.Core.Wrappers;
 using MarkupAttributes;
 using System;
+using System.Linq;
 using UnityEngine;
 using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core
 {
-    [DefaultExecutionOrder(-1)]
+    [DefaultExecutionOrder(-10)]
+    [RequireComponent(typeof(AtomModule))]
     public class AtomCore : MonoBehaviour
     {
         public const byte CHANNEL_MASK = 0x3;
@@ -52,6 +54,7 @@ namespace Atom.Core
         [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
 #endif
         [Box("Settings")]
+        public string[] Addresses;
         [NaughtyAttributes.InfoBox("Release mode is extremely slow, only use it on release builds!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
         [NaughtyAttributes.InfoBox("ASCII is more bandwidth efficient!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
         [Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
@@ -103,7 +106,8 @@ namespace Atom.Core
                     || Conf.IncrementalGc != IncrementalGc
                     || Conf.ReceiveTimeout != ReceiveTimeout
                     || Conf.SendTimeout != SendTimeout
-                    || Conf.PingFrequency != PingFrequency;
+                    || Conf.PingFrequency != PingFrequency
+                    || !Conf.Addresses.SequenceEqual(Addresses);
                 if (isSave)
                 {
                     AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
@@ -120,6 +124,7 @@ namespace Atom.Core
                     Conf.ReceiveTimeout = ReceiveTimeout;
                     Conf.SendTimeout = SendTimeout;
                     Conf.PingFrequency = PingFrequency;
+                    Conf.Addresses = Addresses;
                     SaveSettingsFile();
                 }
             }
@@ -144,6 +149,7 @@ namespace Atom.Core
             ReceiveTimeout = Conf.ReceiveTimeout;
             SendTimeout = Conf.SendTimeout;
             PingFrequency = Conf.PingFrequency;
+            Addresses = Conf.Addresses;
         }
 #endif
     }
