@@ -30,31 +30,33 @@ namespace Atom.Core
     [MessagePackObject]
     public class AtomSettings
     {
-        [Key("debug_mode")]
+        [Key(0)]
+        public string Address = "Debug";
+        [Key(1)]
         public string DebugMode = "Debug";
-        [Key("encoding")]
+        [Key(2)]
         public string Encoding = "ASCII";
-        [Key("max_udp_packet_size")]
+        [Key(3)]
         public int MaxUdpPacketSize = 128;
-        [Key("max_players")]
+        [Key(4)]
         public int MaxPlayers = 12;
-        [Key("max_rec_buffer")]
+        [Key(5)]
         public int MaxRecBuffer = 1024;
-        [Key("max_send_buffer")]
+        [Key(6)]
         public int MaxSendBuffer = 1024;
-        [Key("max_rec_timeout")]
+        [Key(7)]
         public int ReceiveTimeout = -1;
-        [Key("max_send_timeout")]
+        [Key(8)]
         public int SendTimeout = -1;
-        [Key("max_stream_pool")]
+        [Key(9)]
         public int MaxStreamPool = 12;
-        [Key("bandwidth_timeout")]
+        [Key(10)]
         public double BandwidthTimeout = 2;
-        [Key("ping_frequency")]
+        [Key(11)]
         public float PingFrequency = 1f;
-        [Key("bandwidth_counter")]
+        [Key(12)]
         public bool BandwidthCounter = true;
-        [Key("incremental_gc")]
+        [Key(13)]
         public bool IncrementalGc = true;
     }
 

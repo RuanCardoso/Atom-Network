@@ -18,32 +18,34 @@ namespace Atom.Core.Formatters.Atom.Core
 {
     public sealed class AtomSettingsFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::Atom.Core.AtomSettings>
     {
-        // debug_mode
-        private static global::System.ReadOnlySpan<byte> GetSpan_DebugMode() => new byte[1 + 10] { 170, 100, 101, 98, 117, 103, 95, 109, 111, 100, 101 };
-        // encoding
-        private static global::System.ReadOnlySpan<byte> GetSpan_Encoding() => new byte[1 + 8] { 168, 101, 110, 99, 111, 100, 105, 110, 103 };
-        // max_udp_packet_size
-        private static global::System.ReadOnlySpan<byte> GetSpan_MaxUdpPacketSize() => new byte[1 + 19] { 179, 109, 97, 120, 95, 117, 100, 112, 95, 112, 97, 99, 107, 101, 116, 95, 115, 105, 122, 101 };
-        // max_players
-        private static global::System.ReadOnlySpan<byte> GetSpan_MaxPlayers() => new byte[1 + 11] { 171, 109, 97, 120, 95, 112, 108, 97, 121, 101, 114, 115 };
-        // max_rec_buffer
-        private static global::System.ReadOnlySpan<byte> GetSpan_MaxRecBuffer() => new byte[1 + 14] { 174, 109, 97, 120, 95, 114, 101, 99, 95, 98, 117, 102, 102, 101, 114 };
-        // max_send_buffer
-        private static global::System.ReadOnlySpan<byte> GetSpan_MaxSendBuffer() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 101, 110, 100, 95, 98, 117, 102, 102, 101, 114 };
-        // max_rec_timeout
-        private static global::System.ReadOnlySpan<byte> GetSpan_ReceiveTimeout() => new byte[1 + 15] { 175, 109, 97, 120, 95, 114, 101, 99, 95, 116, 105, 109, 101, 111, 117, 116 };
-        // max_send_timeout
-        private static global::System.ReadOnlySpan<byte> GetSpan_SendTimeout() => new byte[1 + 16] { 176, 109, 97, 120, 95, 115, 101, 110, 100, 95, 116, 105, 109, 101, 111, 117, 116 };
-        // max_stream_pool
-        private static global::System.ReadOnlySpan<byte> GetSpan_MaxStreamPool() => new byte[1 + 15] { 175, 109, 97, 120, 95, 115, 116, 114, 101, 97, 109, 95, 112, 111, 111, 108 };
-        // bandwidth_timeout
-        private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthTimeout() => new byte[1 + 17] { 177, 98, 97, 110, 100, 119, 105, 100, 116, 104, 95, 116, 105, 109, 101, 111, 117, 116 };
-        // ping_frequency
-        private static global::System.ReadOnlySpan<byte> GetSpan_PingFrequency() => new byte[1 + 14] { 174, 112, 105, 110, 103, 95, 102, 114, 101, 113, 117, 101, 110, 99, 121 };
-        // bandwidth_counter
-        private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthCounter() => new byte[1 + 17] { 177, 98, 97, 110, 100, 119, 105, 100, 116, 104, 95, 99, 111, 117, 110, 116, 101, 114 };
-        // incremental_gc
-        private static global::System.ReadOnlySpan<byte> GetSpan_IncrementalGc() => new byte[1 + 14] { 174, 105, 110, 99, 114, 101, 109, 101, 110, 116, 97, 108, 95, 103, 99 };
+        // Address
+        private static global::System.ReadOnlySpan<byte> GetSpan_Address() => new byte[1 + 7] { 167, 65, 100, 100, 114, 101, 115, 115 };
+        // DebugMode
+        private static global::System.ReadOnlySpan<byte> GetSpan_DebugMode() => new byte[1 + 9] { 169, 68, 101, 98, 117, 103, 77, 111, 100, 101 };
+        // Encoding
+        private static global::System.ReadOnlySpan<byte> GetSpan_Encoding() => new byte[1 + 8] { 168, 69, 110, 99, 111, 100, 105, 110, 103 };
+        // MaxUdpPacketSize
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxUdpPacketSize() => new byte[1 + 16] { 176, 77, 97, 120, 85, 100, 112, 80, 97, 99, 107, 101, 116, 83, 105, 122, 101 };
+        // MaxPlayers
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxPlayers() => new byte[1 + 10] { 170, 77, 97, 120, 80, 108, 97, 121, 101, 114, 115 };
+        // MaxRecBuffer
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxRecBuffer() => new byte[1 + 12] { 172, 77, 97, 120, 82, 101, 99, 66, 117, 102, 102, 101, 114 };
+        // MaxSendBuffer
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxSendBuffer() => new byte[1 + 13] { 173, 77, 97, 120, 83, 101, 110, 100, 66, 117, 102, 102, 101, 114 };
+        // ReceiveTimeout
+        private static global::System.ReadOnlySpan<byte> GetSpan_ReceiveTimeout() => new byte[1 + 14] { 174, 82, 101, 99, 101, 105, 118, 101, 84, 105, 109, 101, 111, 117, 116 };
+        // SendTimeout
+        private static global::System.ReadOnlySpan<byte> GetSpan_SendTimeout() => new byte[1 + 11] { 171, 83, 101, 110, 100, 84, 105, 109, 101, 111, 117, 116 };
+        // MaxStreamPool
+        private static global::System.ReadOnlySpan<byte> GetSpan_MaxStreamPool() => new byte[1 + 13] { 173, 77, 97, 120, 83, 116, 114, 101, 97, 109, 80, 111, 111, 108 };
+        // BandwidthTimeout
+        private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthTimeout() => new byte[1 + 16] { 176, 66, 97, 110, 100, 119, 105, 100, 116, 104, 84, 105, 109, 101, 111, 117, 116 };
+        // PingFrequency
+        private static global::System.ReadOnlySpan<byte> GetSpan_PingFrequency() => new byte[1 + 13] { 173, 80, 105, 110, 103, 70, 114, 101, 113, 117, 101, 110, 99, 121 };
+        // BandwidthCounter
+        private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthCounter() => new byte[1 + 16] { 176, 66, 97, 110, 100, 119, 105, 100, 116, 104, 67, 111, 117, 110, 116, 101, 114 };
+        // IncrementalGc
+        private static global::System.ReadOnlySpan<byte> GetSpan_IncrementalGc() => new byte[1 + 13] { 173, 73, 110, 99, 114, 101, 109, 101, 110, 116, 97, 108, 71, 99 };
 
         public void Serialize(ref global::MessagePack.MessagePackWriter writer, global::Atom.Core.AtomSettings value, global::MessagePack.MessagePackSerializerOptions options)
         {
@@ -54,7 +56,9 @@ namespace Atom.Core.Formatters.Atom.Core
             }
 
             var formatterResolver = options.Resolver;
-            writer.WriteMapHeader(13);
+            writer.WriteMapHeader(14);
+            writer.WriteRaw(GetSpan_Address());
+            global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.Address, options);
             writer.WriteRaw(GetSpan_DebugMode());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Serialize(ref writer, value.DebugMode, options);
             writer.WriteRaw(GetSpan_Encoding());
@@ -104,100 +108,93 @@ namespace Atom.Core.Formatters.Atom.Core
                     FAIL:
                       reader.Skip();
                       continue;
-                    case 10:
+                    case 7:
+                        if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 32496501869798465UL) { goto FAIL; }
+
+                        ____result.Address = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Deserialize(ref reader, options);
+                        continue;
+                    case 9:
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_DebugMode().Slice(1))) { goto FAIL; }
 
                         ____result.DebugMode = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Deserialize(ref reader, options);
                         continue;
                     case 8:
-                        if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 7453010313431182949UL) { goto FAIL; }
+                        if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 7453010313431182917UL) { goto FAIL; }
 
                         ____result.Encoding = global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string>(formatterResolver).Deserialize(ref reader, options);
                         continue;
-                    case 19:
-                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxUdpPacketSize().Slice(1))) { goto FAIL; }
+                    case 16:
+                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                        {
+                            default: goto FAIL;
+                            case 7012228196048855373UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 7312272752145427299UL) { goto FAIL; }
 
-                        ____result.MaxUdpPacketSize = reader.ReadInt32();
-                        continue;
-                    case 11:
+                                ____result.MaxUdpPacketSize = reader.ReadInt32();
+                                continue;
+
+                            case 8386944367577686338UL:
+                                switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
+                                {
+                                    default: goto FAIL;
+                                    case 8391735962092786792UL:
+                                        ____result.BandwidthTimeout = reader.ReadDouble();
+                                        continue;
+                                    case 8243122710737011560UL:
+                                        ____result.BandwidthCounter = reader.ReadBoolean();
+                                        continue;
+                                }
+
+                        }
+                    case 10:
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxPlayers().Slice(1))) { goto FAIL; }
 
                         ____result.MaxPlayers = reader.ReadInt32();
                         continue;
-                    case 14:
+                    case 12:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxRecBuffer().Slice(1))) { goto FAIL; }
+
+                        ____result.MaxRecBuffer = reader.ReadInt32();
+                        continue;
+                    case 13:
                         switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
                         {
                             default: goto FAIL;
-                            case 6873448998199910765UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 125779835254114UL) { goto FAIL; }
+                            case 4784070085645459789UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 491327481461UL) { goto FAIL; }
 
-                                ____result.MaxRecBuffer = reader.ReadInt32();
+                                ____result.MaxSendBuffer = reader.ReadInt32();
                                 continue;
 
-                            case 7310017705118951792UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 133467960866161UL) { goto FAIL; }
+                            case 7018141438268957005UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 465726034029UL) { goto FAIL; }
+
+                                ____result.MaxStreamPool = reader.ReadInt32();
+                                continue;
+
+                            case 8171062745642199376UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 521359222133UL) { goto FAIL; }
 
                                 ____result.PingFrequency = reader.ReadSingle();
                                 continue;
 
-                            case 7954884599298092649UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 109295633719668UL) { goto FAIL; }
+                            case 7954884599298092617UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 426400047476UL) { goto FAIL; }
 
                                 ____result.IncrementalGc = reader.ReadBoolean();
                                 continue;
 
                         }
-                    case 15:
-                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
-                        {
-                            default: goto FAIL;
-                            case 7236833197428334957UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 32199637825053279UL) { goto FAIL; }
+                    case 14:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_ReceiveTimeout().Slice(1))) { goto FAIL; }
 
-                                ____result.MaxSendBuffer = reader.ReadInt32();
-                                continue;
-
-                            case 6873448998199910765UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 32780218601924980UL) { goto FAIL; }
-
-                                ____result.ReceiveTimeout = reader.ReadInt32();
-                                continue;
-
-                            case 7310033184047522157UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 30521821902105953UL) { goto FAIL; }
-
-                                ____result.MaxStreamPool = reader.ReadInt32();
-                                continue;
-
-                        }
-                    case 16:
+                        ____result.ReceiveTimeout = reader.ReadInt32();
+                        continue;
+                    case 11:
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_SendTimeout().Slice(1))) { goto FAIL; }
 
                         ____result.SendTimeout = reader.ReadInt32();
                         continue;
-                    case 17:
-                        switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
-                        {
-                            default: goto FAIL;
-                            case 8386944367577686370UL:
-                                switch (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey))
-                                {
-                                    default: goto FAIL;
-                                    case 8462093745447526248UL:
-                                        if (stringKey[0] != 116) { goto FAIL; }
-
-                                        ____result.BandwidthTimeout = reader.ReadDouble();
-                                        continue;
-
-                                    case 7310589545788170088UL:
-                                        if (stringKey[0] != 114) { goto FAIL; }
-
-                                        ____result.BandwidthCounter = reader.ReadBoolean();
-                                        continue;
-
-                                }
-
-                        }
 
                 }
             }

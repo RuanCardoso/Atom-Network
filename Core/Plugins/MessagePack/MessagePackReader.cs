@@ -939,7 +939,7 @@ namespace MessagePack
         /// <returns>Nothing. This method always throws.</returns>
         private static Exception ThrowInvalidCode(byte code)
         {
-            throw new MessagePackSerializationException(string.Format("Unexpected msgpack code {0} ({1}) encountered.", code, MessagePackCode.ToFormatName(code)));
+            throw new MessagePackSerializationException(string.Format("Unexpected msgpack code {0} ({1}) encountered. Try in map mode!", code, MessagePackCode.ToFormatName(code)));
         }
 
         /// <summary>

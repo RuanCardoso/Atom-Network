@@ -62,12 +62,14 @@ namespace MessagePack.Unity.Editor
                         csProjFile = asmDef.Name.Replace(".asmdef", ".csproj");
                         string inputPath = Path.Combine("../", csProjFile);
 
+                        bool mapMode = EditorUtility.DisplayDialog("Atom", "Generate with map mode?", "Yes", "No");
                         MpcArgument argument = new()
                         {
                             Input = inputPath,
                             Output = Path.Combine("../", outputPath, "code-gen"),
                             ResolverName = csProjFile.Replace(".csproj", "Resolver").Replace("Assembly-CSharp", "AssemblyCSharp"),
                             Namespace = "Atom.Core",
+                            UseMapMode = mapMode,
                         };
 
                         if (window == null)
