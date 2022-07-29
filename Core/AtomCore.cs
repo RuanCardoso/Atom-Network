@@ -60,7 +60,7 @@ namespace Atom.Core
         [NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
         public int ReceiveTimeout;
         public int SendTimeout;
-        public float PingFrequency;
+        [Range(0.3f, 5f)] public float PingFrequency;
         [Range(1, 128)] public int MaxStreamPool;
         public bool BandwidthCounter;
         [Label("GC Incremental")] public bool IncrementalGc;

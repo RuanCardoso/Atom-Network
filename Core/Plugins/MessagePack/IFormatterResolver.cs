@@ -64,7 +64,7 @@ namespace MessagePack
 
         private static void Throw(Type t, IFormatterResolver resolver)
         {
-            throw new FormatterNotRegisteredException(t.FullName + " is not registered in resolver: " + resolver.GetType());
+            throw new FormatterNotRegisteredException("Did you forget to generate the AOT code? Build Codegen(CTRL+F12)");
         }
 
         private static readonly ThreadsafeTypeKeyHashTable<Func<IFormatterResolver, IMessagePackFormatter>> FormatterGetters =
