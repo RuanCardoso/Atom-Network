@@ -192,7 +192,9 @@ namespace MessagePack.Unity.Editor
 
             EditorGUI.BeginDisabledGroup(invokingMpc);
             if (GUILayout.Button("Generate"))
-                InitCodeGen().RunSynchronously();
+#pragma warning disable CS4014 // Como esta chamada não é esperada, a execução do método atual continua antes de a chamada ser concluída
+                InitCodeGen();
+#pragma warning restore CS4014 // Como esta chamada não é esperada, a execução do método atual continua antes de a chamada ser concluída
             EditorGUI.EndDisabledGroup();
         }
 
