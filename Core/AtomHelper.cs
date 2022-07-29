@@ -48,12 +48,13 @@ namespace Atom.Core
             PlayerSettings.SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.Server, _defines_);
         }
 #endif
-        public static bool AOT()
+        static IFormatterResolver FormatterResolver;
+        public static void SetResolver(IFormatterResolver resolver = null)
         {
-            StaticCompositeResolver.Instance.Register(GeneratedResolver.Instance, StandardResolver.Instance);
-            var resolver = CompositeResolver.Create(StaticCompositeResolver.Instance, MessagePack.Unity.Extension.UnityBlitResolver.Instance, MessagePack.Unity.UnityResolver.Instance, StandardResolver.Instance);
+            FormatterResolver = resolver == null
+                ? (resolver = CompositeResolver.Create(AtomResolver.Instance, MessagePack.Unity.Extension.UnityBlitResolver.Instance, MessagePack.Unity.UnityResolver.Instance, StandardResolver.Instance))
+                : (resolver = CompositeResolver.Create(resolver, FormatterResolver));
             MessagePackSerializer.DefaultOptions = MessagePackSerializerOptions.Standard.WithResolver(resolver);
-            return true;
         }
 
         public static bool Interval(ref double lastTime, double interval)

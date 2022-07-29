@@ -13,11 +13,11 @@
 
 namespace MessagePack.Resolvers
 {
-    public class GeneratedResolver : global::MessagePack.IFormatterResolver
+    public class AtomResolver : global::MessagePack.IFormatterResolver
     {
-        public static readonly global::MessagePack.IFormatterResolver Instance = new GeneratedResolver();
+        public static readonly global::MessagePack.IFormatterResolver Instance = new AtomResolver();
 
-        private GeneratedResolver()
+        private AtomResolver()
         {
         }
 
@@ -32,7 +32,7 @@ namespace MessagePack.Resolvers
 
             static FormatterCache()
             {
-                var f = GeneratedResolverGetFormatterHelper.GetFormatter(typeof(T));
+                var f = AtomResolverGetFormatterHelper.GetFormatter(typeof(T));
                 if (f != null)
                 {
                     Formatter = (global::MessagePack.Formatters.IMessagePackFormatter<T>)f;
@@ -41,11 +41,11 @@ namespace MessagePack.Resolvers
         }
     }
 
-    internal static class GeneratedResolverGetFormatterHelper
+    internal static class AtomResolverGetFormatterHelper
     {
         private static readonly global::System.Collections.Generic.Dictionary<global::System.Type, int> lookup;
 
-        static GeneratedResolverGetFormatterHelper()
+        static AtomResolverGetFormatterHelper()
         {
             lookup = new global::System.Collections.Generic.Dictionary<global::System.Type, int>(1)
             {

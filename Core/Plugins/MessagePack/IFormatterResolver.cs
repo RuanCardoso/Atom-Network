@@ -64,7 +64,7 @@ namespace MessagePack
 
         private static void Throw(Type t, IFormatterResolver resolver)
         {
-            throw new FormatterNotRegisteredException("Did you forget to generate the AOT code? Build Codegen(CTRL+F12)");
+            throw new FormatterNotRegisteredException("Could not load Ahead of Time code, make sure you have generated and loaded it!");
         }
 
         private static readonly ThreadsafeTypeKeyHashTable<Func<IFormatterResolver, IMessagePackFormatter>> FormatterGetters =

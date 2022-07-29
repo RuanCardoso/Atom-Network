@@ -76,7 +76,7 @@ namespace Atom.Core
         {
             if (!_AOT_)
             {
-                _AOT_ = AtomHelper.AOT();
+                AtomHelper.SetResolver();
 #if UNITY_EDITOR
                 if (!Directory.Exists(RES_PATH))
                     Directory.CreateDirectory(RES_PATH);
@@ -85,6 +85,7 @@ namespace Atom.Core
 #else
                 _INIT_ = true;
 #endif
+                _AOT_ = true;
             }
         }
 

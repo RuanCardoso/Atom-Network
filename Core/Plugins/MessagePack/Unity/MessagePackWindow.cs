@@ -2,6 +2,8 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -30,23 +32,57 @@ namespace MessagePack.Unity.Editor
         {
             if (window != null)
             {
-                window.Close();
+                try
+                {
+                    window.Close();
+                }
+                catch { }
             }
 
             // will called OnEnable(singleton instance will be set).
             GetWindow<MessagePackWindow>("CodeGen").Show();
         }
 
-        [MenuItem("Atom/Build Codegen %F12")]
-        public static void InitCodeGenShortcut()
+        [MenuItem("Assets/Build Codegen %F12", priority = -10)]
+        public static async void InitCodeGenShortcut()
         {
-            if (window == null)
-                window = CreateInstance<MessagePackWindow>();
-            window.mpcArgument = MpcArgument.Restore(out bool value);
-            if (!value)
-                throw new InvalidOperationException("Failed to restore mpc argument.");
-            window.InitCodeGen();
-            window = null;
+            var selObj = Selection.GetFiltered(typeof(UnityEngine.Object), SelectionMode.Assets);
+            if (selObj != null)
+            {
+                string csProjFile;
+                string outputPath = AssetDatabase.GetAssetPath(selObj[0]);
+                if (Directory.Exists(outputPath))
+                {
+                    string[] asmDefs = Directory.GetFiles(outputPath, "*.asmdef", SearchOption.TopDirectoryOnly);
+                    if (asmDefs.Length == 0)
+                        asmDefs = new[] { "Assembly-CSharp.asmdef" };
+                    if (asmDefs.Length > 0)
+                    {
+                        FileInfo asmDef = new(asmDefs[0]);
+                        csProjFile = asmDef.Name.Replace(".asmdef", ".csproj");
+                        string inputPath = Path.Combine("../", csProjFile);
+
+                        MpcArgument argument = new()
+                        {
+                            Input = inputPath,
+                            Output = Path.Combine("../", outputPath, "code-gen"),
+                            ResolverName = csProjFile.Replace(".csproj", "Resolver").Replace("Assembly-CSharp", "AssemblyCSharp"),
+                        };
+
+                        if (window == null)
+                            window = CreateInstance<MessagePackWindow>();
+                        window.mpcArgument = argument;
+                        await window.InitCodeGen();
+                        window = null;
+                    }
+                    else
+                        UnityEngine.Debug.LogError("No asmdef file found in " + outputPath);
+                }
+                else
+                    throw new Exception("Not a directory");
+            }
+            else
+                throw new Exception("No selection");
         }
 
         async void OnEnable()
@@ -156,21 +192,21 @@ namespace MessagePack.Unity.Editor
 
             EditorGUI.BeginDisabledGroup(invokingMpc);
             if (GUILayout.Button("Generate"))
-                InitCodeGen();
+                InitCodeGen().RunSynchronously();
             EditorGUI.EndDisabledGroup();
         }
 
-        private async void InitCodeGen()
+        private async Task InitCodeGen()
         {
             var commnadLineArguments = mpcArgument.ToString();
-            UnityEngine.Debug.Log("Waiting.....");
+            UnityEngine.Debug.Log("Generating code with arguments: " + commnadLineArguments);
 
             invokingMpc = true;
             try
             {
                 var log = await ProcessHelper.InvokeProcessStartAsync("mpc", commnadLineArguments);
                 AssetDatabase.Refresh();
-                UnityEngine.Debug.Log("Done!");
+                UnityEngine.Debug.Log("CodeGen finished.");
             }
             finally
             {
