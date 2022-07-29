@@ -46,7 +46,7 @@ namespace Atom.Core.Wrappers
         public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
         {
             _fixedSize = false;
-            _size = Settings.MaxUdpPacketSize;
+            _size = Conf.MaxUdpPacketSize;
             _memoryBuffer = new byte[_size];
             _memoryStream = new(_memoryBuffer, 0, _size);
             _buffer = new byte[_size];

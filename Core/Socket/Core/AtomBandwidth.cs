@@ -35,7 +35,7 @@ namespace Atom.Core
             else
             {
                 double time = localTime - _localTime;
-                if (time >= Settings.BandwidthTimeout)
+                if (time >= Conf.BandwidthTimeout)
                 {
                     _totalMessages = _bytesTransferred = 0;
                     _localTime = localTime;

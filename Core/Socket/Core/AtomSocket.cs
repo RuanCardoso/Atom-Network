@@ -121,19 +121,20 @@ namespace Atom.Core
         private void __Constructor__(EndPoint endPoint)
 #pragma warning restore IDE1006
         {
+            _pingWaiter = new(Conf.PingFrequency);
             _socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
             {
-                ReceiveBufferSize = Settings.MaxRecBuffer,
-                ReceiveTimeout = 0,
-                SendBufferSize = Settings.MaxSendBuffer,
-                SendTimeout = 0,
+                ReceiveBufferSize = Conf.MaxRecBuffer,
+                ReceiveTimeout = Conf.ReceiveTimeout,
+                SendBufferSize = Conf.MaxSendBuffer,
+                SendTimeout = Conf.SendTimeout,
             };
             // Bind the endepoint.
             _socket.Bind(endPoint);
             _cancelTokenSource = new();
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
-            for (int id = 1; id <= Settings.MaxPlayers; id++)
+            for (int id = 1; id <= Conf.MaxPlayers; id++)
             {
                 _ids.Push(id, false);
                 // Pre-alloc memory!
@@ -161,7 +162,7 @@ namespace Atom.Core
             _this.StartCoroutine(ConnectAndPing(address, port));
         }
 
-        private readonly WaitForSeconds _pingWaiter = new(1f);
+        private WaitForSeconds _pingWaiter;
         private IEnumerator ConnectAndPing(string address, int port)
         {
             _destEndPoint = new AtomEndPoint(IPAddress.Parse(address), port);

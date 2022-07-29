@@ -42,10 +42,16 @@ namespace Atom.Core
         public int MaxRecBuffer = 1024;
         [Key("max_send_buffer")]
         public int MaxSendBuffer = 1024;
+        [Key("max_rec_timeout")]
+        public int ReceiveTimeout = -1;
+        [Key("max_send_timeout")]
+        public int SendTimeout = -1;
         [Key("max_stream_pool")]
         public int MaxStreamPool = 12;
         [Key("bandwidth_timeout")]
         public double BandwidthTimeout = 2;
+        [Key("ping_frequency")]
+        public float PingFrequency = 1f;
         [Key("bandwidth_counter")]
         public bool BandwidthCounter = true;
         [Key("incremental_gc")]
@@ -58,13 +64,13 @@ namespace Atom.Core
         private const string RES_PATH = "./Assets/Resources";
         private const string PATH = RES_PATH + "/" + FILE_NAME + ".json";
         private const int MIN_MTU = 512;
-        public const int MAX_PLAYERS = ushort.MaxValue * 4;
+        public const int MAX_PLAYERS = byte.MaxValue * 64;
         private static readonly bool _AOT_;
         private static bool _INIT_;
 
         public static ArrayPool<byte> ArrayPool { get; } = ArrayPool<byte>.Create();
         public static Encoding Encoding { get; private set; }
-        public static AtomSettings Settings { get; private set; } = new();
+        public static AtomSettings Conf { get; private set; } = new();
 
         static AtomGlobal()
         {
@@ -96,7 +102,7 @@ namespace Atom.Core
             if (Directory.Exists(RES_PATH))
             {
                 using TextWriter strFile = File.CreateText(PATH);
-                MessagePackSerializer.SerializeToJson(strFile, Settings);
+                MessagePackSerializer.SerializeToJson(strFile, Conf);
             }
         }
 #endif
@@ -117,17 +123,17 @@ namespace Atom.Core
                     if (asset != null)
                     {
                         byte[] msgBytes = MessagePackSerializer.ConvertFromJson(strFile);
-                        Settings = MessagePackSerializer.Deserialize<AtomSettings>(msgBytes);
-                        if (Settings != null)
+                        Conf = MessagePackSerializer.Deserialize<AtomSettings>(msgBytes);
+                        if (Conf != null)
                         {
-                            if (Settings.MaxUdpPacketSize < 1) Settings.MaxUdpPacketSize = 1;
-                            if (Settings.MaxUdpPacketSize > MIN_MTU)
+                            if (Conf.MaxUdpPacketSize < 1) Conf.MaxUdpPacketSize = 1;
+                            if (Conf.MaxUdpPacketSize > MIN_MTU)
                             {
                                 PrintWarning($"Suggestion: Set \"MaxUdpPacketSize\" to {MIN_MTU} or less to avoid packet loss and fragmentation! Occurs when the packet size exceeds the MTU of some router in the path.");
                                 PrintWarning($"Suggestion: Find the best MTU for your route using the \"AtomHelper.GetBestMTU()\" method, send this information to the server to help it find the best packet size that suits you.");
                             }
 
-                            if (Settings.MaxPlayers > MAX_PLAYERS)
+                            if (Conf.MaxPlayers > MAX_PLAYERS)
                                 throw new Exception($"Max players reached! -> Only {MAX_PLAYERS} players are supported!");
 #if UNITY_EDITOR
                             BuildTarget activeBuildTarget = EditorUserBuildSettings.activeBuildTarget;
@@ -135,12 +141,12 @@ namespace Atom.Core
                             if (PlayerSettings.GetApiCompatibilityLevel(targetGroup) != ApiCompatibilityLevel.NET_Standard || PlayerSettings.GetApiCompatibilityLevel(UnityEditor.Build.NamedBuildTarget.Server) != ApiCompatibilityLevel.NET_Standard)
                                 PrintWarning("Suggestion: Set the \"Api Compatibility Level\" to .NET Standard 2.1 or higher to best support Atom!");
 
-                            PlayerSettings.gcIncremental = Settings.IncrementalGc;
+                            PlayerSettings.gcIncremental = Conf.IncrementalGc;
                             if (!PlayerSettings.gcIncremental)
                                 PrintWarning("Suggestion: Enable \"Incremental GC\" to best performance!");
 
-                            AtomHelper.SetDefine(!Settings.BandwidthCounter, "", "ATOM_BANDWIDTH_COUNTER");
-                            switch (Settings.DebugMode.ToLower())
+                            AtomHelper.SetDefine(!Conf.BandwidthCounter, "", "ATOM_BANDWIDTH_COUNTER");
+                            switch (Conf.DebugMode.ToLower())
                             {
                                 case "debug":
                                     AtomHelper.SetDefine(false, "ATOM_RELEASE", "ATOM_DEBUG");
@@ -156,7 +162,7 @@ namespace Atom.Core
                                     throw new Exception("Atom.Core: Debug mode not found!");
                             }
 
-                            switch (Settings.MaxPlayers)
+                            switch (Conf.MaxPlayers)
                             {
                                 case <= byte.MaxValue:
                                     AtomHelper.SetDefine(false, "ATOM_USHORT_PLAYER_ID;ATOM_INT_PLAYER_ID", "ATOM_BYTE_PLAYER_ID");
@@ -173,7 +179,7 @@ namespace Atom.Core
 #endif
                             try
                             {
-                                Encoding = Encoding.GetEncoding(Settings.Encoding);
+                                Encoding = Encoding.GetEncoding(Conf.Encoding);
                             }
                             catch
                             {

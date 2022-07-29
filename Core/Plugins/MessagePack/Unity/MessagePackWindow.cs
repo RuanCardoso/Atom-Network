@@ -25,7 +25,7 @@ namespace MessagePack.Unity.Editor
         MpcArgument mpcArgument;
 
         //[MenuItem("Window/MessagePack/CodeGenerator")]
-        [MenuItem("Atom/Open Codegen")]
+        [MenuItem("Atom/Open Codegen %F11")]
         public static void OpenWindow()
         {
             if (window != null)
@@ -35,6 +35,18 @@ namespace MessagePack.Unity.Editor
 
             // will called OnEnable(singleton instance will be set).
             GetWindow<MessagePackWindow>("CodeGen").Show();
+        }
+
+        [MenuItem("Atom/Build Codegen %F12")]
+        public static void InitCodeGenShortcut()
+        {
+            if (window == null)
+                window = CreateInstance<MessagePackWindow>();
+            window.mpcArgument = MpcArgument.Restore(out bool value);
+            if (!value)
+                throw new InvalidOperationException("Failed to restore mpc argument.");
+            window.InitCodeGen();
+            window = null;
         }
 
         async void OnEnable()
@@ -53,7 +65,7 @@ namespace MessagePack.Unity.Editor
             }
             finally
             {
-                mpcArgument = MpcArgument.Restore();
+                mpcArgument = MpcArgument.Restore(out _);
                 processInitialized = true;
             }
         }
@@ -190,10 +202,12 @@ namespace MessagePack.Unity.Editor
 
         static string Key => "MessagePackCodeGen." + Application.productName;
 
-        public static MpcArgument Restore()
+        public static MpcArgument Restore(out bool value)
         {
+            value = false;
             if (EditorPrefs.HasKey(Key))
             {
+                value = true;
                 var json = EditorPrefs.GetString(Key);
                 return JsonUtility.FromJson<MpcArgument>(json);
             }

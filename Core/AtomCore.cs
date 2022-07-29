@@ -45,19 +45,22 @@ namespace Atom.Core
 #if UNITY_EDITOR
 #if ATOM_BANDWIDTH_COUNTER
         [Box("Bandwidth")]
-        [Label("Timeout")] public double BandwidthTimeout;
+        [Label("Timeout")][Range(1, 10)] public double BandwidthTimeout;
         [Box("Bandwidth/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string SERVER_REC_MSG_RATE = "0 Bytes/s";
         [Box("Bandwidth/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
 #endif
         [Box("Settings")]
-        public BuildMode Build;
-        public EncodingType Encoding;
+        [NaughtyAttributes.InfoBox("Release mode is extremely slow, only use it on release builds!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
+        [NaughtyAttributes.InfoBox("ASCII is more bandwidth efficient!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
         [Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
         [Range(1, MAX_PLAYERS)][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)][Label("Receive Size")] public int MaxPlayers;
         [NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
         [NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
+        public int ReceiveTimeout;
+        public int SendTimeout;
+        public float PingFrequency;
         [Range(1, 128)] public int MaxStreamPool;
         public bool BandwidthCounter;
         [Label("GC Incremental")] public bool IncrementalGc;
@@ -67,7 +70,7 @@ namespace Atom.Core
             Module = this;
             NetworkTime = Time.timeAsDouble;
             LoadSettingsFile();
-            Streams = new(() => new(true, false, false), Settings.MaxStreamPool, false, true, "AtomStreamPool");
+            Streams = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPool");
         }
 
         private void Start()
@@ -88,29 +91,35 @@ namespace Atom.Core
             if (!Application.isPlaying)
             {
                 string _encoding_ = Encoding.ToString().Replace("UTF8", "UTF-8").Replace("UTF16", "UTF-16").Replace("UTF32", "UTF-32");
-                bool isSave = Settings.DebugMode != Build.ToString()
-                    || Settings.Encoding != _encoding_
-                    || Settings.MaxUdpPacketSize != MaxUdpMessageSize
-                    || Settings.MaxPlayers != MaxPlayers
-                    || Settings.MaxRecBuffer != MaxRecBuffer
-                    || Settings.MaxSendBuffer != MaxSendBuffer
-                    || Settings.MaxStreamPool != MaxStreamPool
-                    || Settings.BandwidthTimeout != BandwidthTimeout
-                    || Settings.BandwidthCounter != BandwidthCounter
-                    || Settings.IncrementalGc != IncrementalGc;
+                bool isSave = Conf.DebugMode != Build.ToString()
+                    || Conf.Encoding != _encoding_
+                    || Conf.MaxUdpPacketSize != MaxUdpMessageSize
+                    || Conf.MaxPlayers != MaxPlayers
+                    || Conf.MaxRecBuffer != MaxRecBuffer
+                    || Conf.MaxSendBuffer != MaxSendBuffer
+                    || Conf.MaxStreamPool != MaxStreamPool
+                    || Conf.BandwidthTimeout != BandwidthTimeout
+                    || Conf.BandwidthCounter != BandwidthCounter
+                    || Conf.IncrementalGc != IncrementalGc
+                    || Conf.ReceiveTimeout != ReceiveTimeout
+                    || Conf.SendTimeout != SendTimeout
+                    || Conf.PingFrequency != PingFrequency;
                 if (isSave)
                 {
                     AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
-                    Settings.DebugMode = Build.ToString();
-                    Settings.Encoding = _encoding_;
-                    Settings.MaxUdpPacketSize = MaxUdpMessageSize;
-                    Settings.MaxPlayers = MaxPlayers;
-                    Settings.MaxRecBuffer = MaxRecBuffer;
-                    Settings.MaxSendBuffer = MaxSendBuffer;
-                    Settings.MaxStreamPool = MaxStreamPool;
-                    Settings.BandwidthTimeout = BandwidthTimeout;
-                    Settings.BandwidthCounter = BandwidthCounter;
-                    Settings.IncrementalGc = IncrementalGc;
+                    Conf.DebugMode = Build.ToString();
+                    Conf.Encoding = _encoding_;
+                    Conf.MaxUdpPacketSize = MaxUdpMessageSize;
+                    Conf.MaxPlayers = MaxPlayers;
+                    Conf.MaxRecBuffer = MaxRecBuffer;
+                    Conf.MaxSendBuffer = MaxSendBuffer;
+                    Conf.MaxStreamPool = MaxStreamPool;
+                    Conf.BandwidthTimeout = BandwidthTimeout;
+                    Conf.BandwidthCounter = BandwidthCounter;
+                    Conf.IncrementalGc = IncrementalGc;
+                    Conf.ReceiveTimeout = ReceiveTimeout;
+                    Conf.SendTimeout = SendTimeout;
+                    Conf.PingFrequency = PingFrequency;
                     SaveSettingsFile();
                 }
             }
@@ -122,16 +131,19 @@ namespace Atom.Core
                 SaveSettingsFile();
 
             AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
-            Build = Enum.Parse<BuildMode>(Settings.DebugMode);
-            Encoding = Enum.Parse<EncodingType>(Settings.Encoding.Replace("UTF-8", "UTF8").Replace("UTF-16", "UTF16").Replace("UTF-32", "UTF32"));
-            MaxUdpMessageSize = Settings.MaxUdpPacketSize;
-            MaxPlayers = Settings.MaxPlayers;
-            MaxRecBuffer = Settings.MaxRecBuffer;
-            MaxSendBuffer = Settings.MaxSendBuffer;
-            MaxStreamPool = Settings.MaxStreamPool;
-            BandwidthTimeout = Settings.BandwidthTimeout;
-            BandwidthCounter = Settings.BandwidthCounter;
-            IncrementalGc = Settings.IncrementalGc;
+            Build = Enum.Parse<BuildMode>(Conf.DebugMode);
+            Encoding = Enum.Parse<EncodingType>(Conf.Encoding.Replace("UTF-8", "UTF8").Replace("UTF-16", "UTF16").Replace("UTF-32", "UTF32"));
+            MaxUdpMessageSize = Conf.MaxUdpPacketSize;
+            MaxPlayers = Conf.MaxPlayers;
+            MaxRecBuffer = Conf.MaxRecBuffer;
+            MaxSendBuffer = Conf.MaxSendBuffer;
+            MaxStreamPool = Conf.MaxStreamPool;
+            BandwidthTimeout = Conf.BandwidthTimeout;
+            BandwidthCounter = Conf.BandwidthCounter;
+            IncrementalGc = Conf.IncrementalGc;
+            ReceiveTimeout = Conf.ReceiveTimeout;
+            SendTimeout = Conf.SendTimeout;
+            PingFrequency = Conf.PingFrequency;
         }
 #endif
     }
