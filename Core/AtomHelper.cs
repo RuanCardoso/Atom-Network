@@ -13,6 +13,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
+using Atom.Core.Resolvers;
 using MessagePack;
 using MessagePack.Resolvers;
 using System;

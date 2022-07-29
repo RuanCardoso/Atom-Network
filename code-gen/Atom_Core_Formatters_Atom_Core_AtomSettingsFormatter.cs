@@ -14,7 +14,7 @@
 #pragma warning disable SA1403 // File may only contain a single namespace
 #pragma warning disable SA1649 // File name should match first type name
 
-namespace MessagePack.Formatters.Atom.Core
+namespace Atom.Core.Formatters.Atom.Core
 {
     public sealed class AtomSettingsFormatter : global::MessagePack.Formatters.IMessagePackFormatter<global::Atom.Core.AtomSettings>
     {

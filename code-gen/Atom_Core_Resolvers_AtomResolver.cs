@@ -11,7 +11,7 @@
 #pragma warning disable SA1312 // Variable names should begin with lower-case letter
 #pragma warning disable SA1649 // File name should match first type name
 
-namespace MessagePack.Resolvers
+namespace Atom.Core.Resolvers
 {
     public class AtomResolver : global::MessagePack.IFormatterResolver
     {
@@ -63,7 +63,7 @@ namespace MessagePack.Resolvers
 
             switch (key)
             {
-                case 0: return new MessagePack.Formatters.Atom.Core.AtomSettingsFormatter();
+                case 0: return new Atom.Core.Formatters.Atom.Core.AtomSettingsFormatter();
                 default: return null;
             }
         }

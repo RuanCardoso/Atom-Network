@@ -67,6 +67,7 @@ namespace MessagePack.Unity.Editor
                             Input = inputPath,
                             Output = Path.Combine("../", outputPath, "code-gen"),
                             ResolverName = csProjFile.Replace(".csproj", "Resolver").Replace("Assembly-CSharp", "AssemblyCSharp"),
+                            Namespace = "Atom.Core",
                         };
 
                         if (window == null)
