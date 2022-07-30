@@ -15,6 +15,7 @@
 #if UNITY_2021_3_OR_NEWER
 using Atom.Core.Interface;
 using Atom.Core.Wrappers;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
@@ -51,13 +52,14 @@ namespace Atom.Core
 #pragma warning disable IDE1006
         public static void gRPC(byte id, AtomStream writer, Channel channel = Channel.Unreliable, Target target = Target.Single, int playerId = 0)
         {
-            int countBytes = writer.CountBytes;
-            byte[] buffer = writer.GetBuffer();
-            writer.Position = sizeof(byte) * 2;
-            writer.Write(buffer, 0, countBytes);
+            int count = writer.CountBytes;
+            byte[] data = writer.GetBuffer();
+            writer.Reset(pos: sizeof(byte) * 2);
+            data.Write(writer, 0, count);
             writer.Position = 0;
-            writer.Write((byte)Message.gRPC);
-            writer.Write(id);
+            ((byte)Message.gRPC).Write(writer);
+            id.Write(writer);
+            writer.Position = writer.CountBytes;
             if (playerId == 0) _instance._client.SendToServer(writer, channel, target);
             else _instance._server.SendToClient(writer, channel, target, playerId: playerId);
         }
@@ -65,12 +67,25 @@ namespace Atom.Core
 
         public void OnMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
         {
-            // reader.Read(out byte value);
-            // Message message = (Message)value;
-            // if (isServer)
-            // {
-
-            // }
+            Message message = (Message)reader.ReadByte();
+            if (isServer)
+            {
+                switch (message)
+                {
+                    case Message.gRPC:
+                        byte id = reader.ReadByte();
+                        if (AtomBehaviour.gRPCMethods.TryGetValue(id, out Action<AtomStream> gRPC))
+                        {
+                            AtomStream gRPCStream = AtomStream.Get();
+                            byte[] data = reader.ReadNext(out int length);
+                            gRPCStream.SetBuffer(data, 0, length);
+                            gRPC(gRPCStream);
+                        }
+                        else
+                            throw new Exception($"gRPC method with id: {id} -> not found.");
+                        break;
+                }
+            }
         }
 
         public int GetFreePort()

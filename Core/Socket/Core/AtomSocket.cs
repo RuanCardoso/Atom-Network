@@ -281,13 +281,13 @@ namespace Atom.Core
             Send(message, channel, targetMode, Operation.Data, playerId, 0);
         }
 
-        public void SendToServer(AtomStream message, Channel channel, Target targetMode)
+        public void SendToServer(AtomStream message, Channel channel, Target target)
         {
 #if ATOM_DEBUG
             if (((channel == Channel.ReliableAndOrderly || channel == Channel.Reliable) && _id == 0) || _destEndPoint == null)
                 throw new Exception("[Atom] -> You must connect to the server before sending data.");
 #endif
-            Send(message, channel, targetMode, Operation.Sequence, _id, 0);
+            Send(message, channel, target, Operation.Sequence, _id, 0);
         }
 
         private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, int playerId, int seqAck = 0)
@@ -384,7 +384,7 @@ namespace Atom.Core
         {
             new Thread(() =>
             {
-                void internal_Send(byte[] data, int length, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
+                void internal_iCall(byte[] data, int length, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
                 {
                     using AtomStream reader = AtomStream.Get();
                     using AtomStream writer = AtomStream.Get();
@@ -528,7 +528,7 @@ namespace Atom.Core
                                 case Channel.Unreliable:
                                     {
                                         byte[] data = message.ReadNext(out int length);
-                                        internal_Send(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                        internal_iCall(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                         break;
                                     }
                             }

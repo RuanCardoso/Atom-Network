@@ -19,6 +19,8 @@ namespace Atom.Core
 {
     public static class AtomExtensions
     {
+        public static void Write(this byte[] value, AtomStream writer, int offset, int countBytes) =>
+            writer.Write(value, offset, countBytes);
         public static void Write(this int value, AtomStream atomStream) =>
             atomStream.Write(value);
         public static void Write(this uint value, AtomStream atomStream) =>
