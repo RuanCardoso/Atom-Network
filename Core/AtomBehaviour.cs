@@ -25,7 +25,7 @@ namespace Atom.Core
     [DefaultExecutionOrder(-2)]
     public class AtomBehaviour : MonoBehaviour
     {
-        internal static readonly Dictionary<byte, Action<AtomStream>> gRPCMethods = new();
+        internal static readonly Dictionary<byte, Action<AtomStream, bool, int>> gRPCMethods = new();
         private void Awake()
         {
             Type typeOf = this.GetType();
@@ -36,9 +36,9 @@ namespace Atom.Core
                 gRPCAttribute attr = method.GetCustomAttribute<gRPCAttribute>(true);
                 if (attr != null)
                 {
-                    if (method.GetParameters().Length < 1)
-                        throw new Exception($"gRPC method with id: {attr.id} -> name: {method.Name} -> requires the (AtomStream) parameter in the same order as the method signature.");
-                    Action<AtomStream> gRPC = method.CreateDelegate(typeof(Action<AtomStream>), this) as Action<AtomStream>;
+                    if (method.GetParameters().Length < 3)
+                        throw new Exception($"gRPC method with id: {attr.id} -> name: {method.Name} -> requires the (AtomStream, bool, int) parameter in the same order as the method signature.");
+                    Action<AtomStream, bool, int> gRPC = method.CreateDelegate(typeof(Action<AtomStream, bool, int>), this) as Action<AtomStream, bool, int>;
                     if (!gRPCMethods.TryAdd(attr.id, gRPC))
                         throw new Exception($"gRPC method with id: {attr.id} -> name: {method.Name} -> already exists. Obs: Don't add this to multi-instance objects, eg: Your player. A unique id is required.");
                 }

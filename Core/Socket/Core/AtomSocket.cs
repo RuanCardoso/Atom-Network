@@ -44,6 +44,7 @@ using Atom.Core.Wrappers;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -113,7 +114,7 @@ namespace Atom.Core
         /// <summary>List of exlusive id's, used to prevent the same id to be used twice.</summary>
         private readonly AtomSafelyQueue<int> _ids = new(true);
         /// <summary> Returns whether the "Instance" is the Server or the Client. </summary>
-        public bool IsServer { get; private set; } = true;
+        public bool IsServer { get; private set; }
 
         private readonly ISocket ISocket;
         public AtomSocket(ISocket iSocket) => ISocket = iSocket;
@@ -143,8 +144,9 @@ namespace Atom.Core
             _ids.Sort();
         }
 
-        public void Initialize(string address, int port)
+        public void Initialize(string address, int port, bool isServer)
         {
+            IsServer = isServer;
             // Initialize the constructor!
             __Constructor__(new IPEndPoint(IPAddress.Parse(address), port));
             // Start the receive thread.
@@ -234,6 +236,7 @@ namespace Atom.Core
                                 {
                                     _id.Read(reader);
                                     _clientsById.TryAdd(_id, new(_id, _endPoint.GetIPAddress(), _endPoint.GetPort()));
+                                    AtomLogger.Print("Client connected!");
                                 }
                             }
                             else
@@ -292,6 +295,9 @@ namespace Atom.Core
 
         private void Send(AtomStream messageStream, Channel channelMode, Target targetMode, Operation opMode, int playerId, int seqAck = 0)
         {
+            if (IsServer && targetMode == Target.Server)
+                return;
+
             var data = messageStream.GetBuffer();
             int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? RELIABLE_SIZE : UNRELIABLE_SIZE;
 #if ATOM_DEBUG
@@ -542,12 +548,16 @@ namespace Atom.Core
                     if (ex.ErrorCode == 10004)
                         return;
 
-                    Debug.LogException(ex);
+                    AtomLogger.LogStacktrace(ex);
                 }
                 catch (ThreadAbortException) { }
+                catch (KeyNotFoundException)
+                {
+                    AtomLogger.PrintError("The server instance does not exist on the client.");
+                }
                 catch (Exception ex)
                 {
-                    Debug.LogException(ex);
+                    AtomLogger.LogStacktrace(ex);
                 }
             })
             {

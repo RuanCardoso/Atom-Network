@@ -34,19 +34,32 @@ namespace Atom.Core
         {
             _instance = this;
 #if UNITY_SERVER || UNITY_EDITOR
-            _server = new(this);
-            _server.Initialize("0.0.0.0", 5055);
+            try
+            {
+                _server = new(this);
+                _server.Initialize("0.0.0.0", 5055, true);
+            }
+            catch (SocketException ex)
+            {
+                if (ex.ErrorCode == 10048)
+                    AtomLogger.Print("The server is already running.");
+            }
 #endif
 #if !UNITY_SERVER || UNITY_EDITOR
             _client = new(this);
-            _client.Initialize("0.0.0.0", GetFreePort());
+            _client.Initialize("0.0.0.0", GetFreePort(), false);
 #endif
         }
 
         void Start()
         {
+#if !UNITY_SERVER || UNITY_EDITOR
             string[] address = Conf.Addresses[0].Split(':');
             _client.Connect(address[0], int.Parse(address[1]), this);
+#endif
+#if UNITY_SERVER
+            Console.Clear();
+#endif
         }
 
 #pragma warning disable IDE1006
@@ -68,21 +81,26 @@ namespace Atom.Core
         public void OnMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
         {
             Message message = (Message)reader.ReadByte();
-            if (isServer)
+            if (isServer || !isServer)
             {
                 switch (message)
                 {
                     case Message.gRPC:
                         byte id = reader.ReadByte();
-                        if (AtomBehaviour.gRPCMethods.TryGetValue(id, out Action<AtomStream> gRPC))
+                        if (AtomBehaviour.gRPCMethods.TryGetValue(id, out Action<AtomStream, bool, int> gRPC))
                         {
                             AtomStream gRPCStream = AtomStream.Get();
                             byte[] data = reader.ReadNext(out int length);
                             gRPCStream.SetBuffer(data, 0, length);
-                            gRPC(gRPCStream);
+                            gRPC(gRPCStream, isServer, playerId);
+                            if (isServer)
+                                AtomNetwork.gRPC(id, writer, channel, target, playerId);
                         }
                         else
-                            throw new Exception($"gRPC method with id: {id} -> not found.");
+                        {
+                            if (isServer)
+                                AtomNetwork.gRPC(id, writer, channel, target, playerId);
+                        }
                         break;
                 }
             }
