@@ -14,7 +14,7 @@
 
 #if UNITY_EDITOR
 #if UNITY_2021_3_OR_NEWER
-using Atom.Core.Attribute;
+using Atom.Core.Attributes;
 using UnityEditor;
 using UnityEngine;
 

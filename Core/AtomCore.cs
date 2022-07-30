@@ -13,7 +13,7 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
-using Atom.Core.Attribute;
+using Atom.Core.Attributes;
 using Atom.Core.Wrappers;
 using MarkupAttributes;
 using System;

@@ -49,7 +49,7 @@ namespace Atom.Core.Wrappers
                 if (_createNewObjectIfNotAvailable)
                     return _generator();
                 else
-                    AtomLogger.PrintError($"Memory Leak: [>{_name}<]: You overflowed the pool! You won't get the performance benefits of the pool. Increase the pool capacity, if the error happens again, you may be forgetting to return the item to the pool.");
+                    AtomLogger.PrintError($"Memory leak detected in '{_name}' pool. Please, increase the pool capacity or call the 'Dispose' method!");
             }
 
             return _generator();

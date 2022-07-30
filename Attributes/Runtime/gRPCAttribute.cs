@@ -13,16 +13,19 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
-using UnityEngine;
+using System;
 
 namespace Atom.Core.Attributes
 {
-    public class LabelAttribute : PropertyAttribute
+#pragma warning disable IDE1006
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+    public class gRPCAttribute : Attribute
+#pragma warning restore IDE1006
     {
-        internal readonly string label;
-        public LabelAttribute(string label)
+        internal readonly byte id;
+        public gRPCAttribute(byte id)
         {
-            this.label = label;
+            this.id = id;
         }
     }
 }
