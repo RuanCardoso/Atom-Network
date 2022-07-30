@@ -185,8 +185,7 @@ namespace Atom.Core
 
         public void OnMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channelMode, Target targetMode, Operation opMode, bool isServer)
         {
-            reader.Read(out byte value);
-            Message message = (Message)value;
+            Message message = (Message)reader.ReadByte();
             switch (message)
             {
                 case Message.ConnectAndPing:
@@ -218,7 +217,7 @@ namespace Atom.Core
                             {
                                 Relay(playerId);
                                 /****************************************************************/
-                                reader.Read(out double timeOfClient);
+                                double timeOfClient = reader.ReadDouble();
                                 /****************************************************************/
                                 writer.Write((byte)Message.ConnectAndPing);
                                 writer.Write(timeOfClient);
@@ -241,8 +240,8 @@ namespace Atom.Core
                             {
                                 Relay(playerId);
                                 /****************************************************************/
-                                reader.Read(out double timeOfClient);
-                                reader.Read(out double timeOfServer);
+                                double timeOfClient = reader.ReadDouble();
+                                double timeOfServer = reader.ReadDouble();
                                 /****************************************************************/
                                 AtomTime.SetTime(timeOfClient, timeOfServer);
                                 /****************************************************************/
@@ -271,14 +270,15 @@ namespace Atom.Core
             }
         }
 
-        public void SendToClient(AtomStream message, Channel channel, Target targetMode, Operation opMode, int playerId)
+        public void SendToClient(AtomStream message, Channel channel, Target targetMode, Operation opMode = Operation.Sequence, int playerId = 0)
         {
-            if (opMode == Operation.Sequence)
-                Send(message, channel, targetMode, Operation.Data, playerId, 0);
 #if ATOM_DEBUG
-            else
-                throw new Exception("Operation not supported!");
+            if (playerId == 0)
+                throw new Exception("Can't send to client 0!");
+            if (opMode != Operation.Sequence)
+                throw new Exception("Can't send to client with non-sequential operation!");
 #endif
+            Send(message, channel, targetMode, Operation.Data, playerId, 0);
         }
 
         public void SendToServer(AtomStream message, Channel channel, Target targetMode)
@@ -432,23 +432,19 @@ namespace Atom.Core
                             }
 #endif
 
-                            int playerId = 0;
                             using AtomStream message = AtomStream.Get();
                             message.SetBuffer(buffer, 0, bytesTransferred);
-                            message.Read(out byte header);
+                            byte encoded = message.ReadByte();
 #if ATOM_BYTE_PLAYER_ID
-                            message.Read(out byte _playerId);
-                            playerId = _playerId;
+                            int playerId = message.ReadByte();
 #elif ATOM_USHORT_PLAYER_ID
-                            message.Read(out ushort _playerId);
-                            playerId = _playerId;
+                            int playerId = message.ReadUShort();
 #elif ATOM_INT_PLAYER_ID
-                            message.Read(out int _playerId);
-                            playerId = _playerId;
+                            int playerId = message.ReadInt();
 #endif
-                            Channel channelMode = (Channel)(byte)(header & CHANNEL_MASK);
-                            Target targetMode = (Target)(byte)((header >> 2) & TARGET_MASK);
-                            Operation opMode = (Operation)(byte)((header >> 5) & OPERATION_MASK);
+                            Channel channelMode = (Channel)(byte)(encoded & CHANNEL_MASK);
+                            Target targetMode = (Target)(byte)((encoded >> 2) & TARGET_MASK);
+                            Operation opMode = (Operation)(byte)((encoded >> 5) & OPERATION_MASK);
 #if ATOM_DEBUG
                             if (((byte)channelMode) > CHANNEL_MASK || ((byte)targetMode) > TARGET_MASK || ((byte)opMode) > OPERATION_MASK)
                                 throw new Exception("[Atom] Send -> The channelMode, targetMode or opMode is not correct.");
@@ -459,7 +455,7 @@ namespace Atom.Core
                                 case Channel.ReliableAndOrderly:
                                     {
                                         //AtomChannel channel = _channels[(playerId, (byte)channelMode)];
-                                        message.Read(out int seqAck);
+                                        int seqAck = message.ReadInt();
                                         AtomLogger.Print($"{seqAck}");
                                         if (opMode == Operation.Acknowledgement)
                                         {

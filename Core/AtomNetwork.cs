@@ -23,13 +23,15 @@ using static Atom.Core.AtomGlobal;
 namespace Atom.Core
 {
     [DefaultExecutionOrder(-5)]
-    public class AtomModule : MonoBehaviour, ISocket
+    public class AtomNetwork : MonoBehaviour, ISocket
     {
+        private static AtomNetwork _instance;
         private AtomSocket _server;
         private AtomSocket _client;
 
         private void Awake()
         {
+            _instance = this;
 #if UNITY_SERVER || UNITY_EDITOR
             _server = new(this);
             _server.Initialize("0.0.0.0", 5055);
@@ -47,24 +49,28 @@ namespace Atom.Core
         }
 
 #pragma warning disable IDE1006
-        public void gRPC(byte id, AtomStream writer, Channel channel = Channel.Unreliable, Target target = Target.Single, int playerId = 0)
+        public static void gRPC(byte id, AtomStream writer, Channel channel = Channel.Unreliable, Target target = Target.Single, int playerId = 0)
         {
             int countBytes = writer.CountBytes;
             byte[] buffer = writer.GetBuffer();
-            writer.Position = sizeof(byte);
+            writer.Position = sizeof(byte) * 2;
             writer.Write(buffer, 0, countBytes);
             writer.Position = 0;
+            writer.Write((byte)Message.gRPC);
             writer.Write(id);
-            if (playerId == 0)
-                _client.SendToServer(writer, channel, target);
-            else
-                _server.SendToClient(writer, channel, target, Operation.Sequence, playerId);
+            if (playerId == 0) _instance._client.SendToServer(writer, channel, target);
+            else _instance._server.SendToClient(writer, channel, target, playerId: playerId);
         }
 #pragma warning restore IDE1006
 
         public void OnMessageCompleted(AtomStream reader, AtomStream writer, int playerId, EndPoint endPoint, Channel channel, Target target, Operation operation, bool isServer)
         {
-            throw new System.NotImplementedException();
+            // reader.Read(out byte value);
+            // Message message = (Message)value;
+            // if (isServer)
+            // {
+
+            // }
         }
 
         public int GetFreePort()

@@ -59,7 +59,7 @@ namespace Atom.Core
     public enum Message : byte
     {
         ConnectAndPing = 1,
-        Test,
+        gRPC,
     } // Zero is reserved for the default message.
 }
 #endif

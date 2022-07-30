@@ -24,7 +24,7 @@ using static Atom.Core.AtomGlobal;
 namespace Atom.Core
 {
     [DefaultExecutionOrder(-10)]
-    [RequireComponent(typeof(AtomModule))]
+    [RequireComponent(typeof(AtomNetwork))]
     public class AtomCore : MonoBehaviour
     {
         public const byte CHANNEL_MASK = 0x3;

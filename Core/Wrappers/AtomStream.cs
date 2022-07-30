@@ -71,8 +71,7 @@ namespace Atom.Core.Wrappers
             _countBytes += 1;
         }
 
-        public void Read(out byte value) =>
-            value = (byte)_memoryStream.ReadByte();
+        public byte ReadByte() => (byte)_memoryStream.ReadByte();
         public void Write(int value)
         {
             int count = sizeof(int);
@@ -87,18 +86,17 @@ namespace Atom.Core.Wrappers
             Write(_buffer, 0, count);
         }
 
-        public void Read(out int value)
+        public int ReadInt()
         {
             Read(4);
-            value = _buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24;
+            return _buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24;
         }
 
         public void Write(uint value) =>
             Write((int)value);
-        public void Read(out uint value)
+        public uint ReadUInt()
         {
-            Read(out int unsignedValue);
-            value = (uint)unsignedValue;
+            return (uint)ReadInt();
         }
 
         public void Write(short value)
@@ -113,18 +111,17 @@ namespace Atom.Core.Wrappers
             Write(_buffer, 0, count);
         }
 
-        public void Read(out short value)
+        public short ReadShort()
         {
             Read(2);
-            value = (short)(_buffer[0] | _buffer[1] << 8);
+            return (short)(_buffer[0] | _buffer[1] << 8);
         }
 
         public void Write(ushort value) =>
             Write((short)value);
-        public void Read(out ushort value)
+        public ushort ReadUShort()
         {
-            Read(out short unsignedValue);
-            value = (ushort)unsignedValue;
+            return (ushort)ReadShort();
         }
 
         public unsafe void Write(float value)
@@ -142,11 +139,11 @@ namespace Atom.Core.Wrappers
             Write(_buffer, 0, count);
         }
 
-        public unsafe void Read(out float value)
+        public unsafe float ReadFloat()
         {
             Read(4);
             uint TmpValue = (uint)(_buffer[0] | _buffer[1] << 8 | _buffer[2] << 16 | _buffer[3] << 24);
-            value = *(float*)&TmpValue;
+            return *(float*)&TmpValue;
         }
 
         public unsafe virtual void Write(double value)
@@ -168,7 +165,7 @@ namespace Atom.Core.Wrappers
             Write(_buffer, 0, count);
         }
 
-        public unsafe virtual void Read(out double value)
+        public unsafe virtual double ReadDouble()
         {
             Read(8);
             uint lo = (uint)(_buffer[0] | _buffer[1] << 8 |
@@ -177,7 +174,7 @@ namespace Atom.Core.Wrappers
                 _buffer[6] << 16 | _buffer[7] << 24);
 
             ulong tmpBuffer = ((ulong)hi) << 32 | lo;
-            value = *(double*)&tmpBuffer;
+            return *(double*)&tmpBuffer;
         }
 
         public void Write7BitEncodedInt(int value)
@@ -232,12 +229,12 @@ namespace Atom.Core.Wrappers
                 ArrayPool.Return(rentBytes);
         }
 
-        public void Read(out string value)
+        public string ReadString()
         {
             ReadOnlySpan<byte> _bytes = _buffer;
             int length = Read7BitEncodedInt();
             Read(length);
-            value = Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
+            return Encoding.GetString(_bytes[..length]); // String.FastAllocateString(): Garbage is created here, how to avoid?
         }
 
         public ReadOnlySpan<byte> ReadNextAsReadOnlySpan()
