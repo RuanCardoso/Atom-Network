@@ -130,9 +130,8 @@ namespace Atom.Core
                 SendBufferSize = Conf.MaxSendBuffer,
                 SendTimeout = Conf.SendTimeout,
             };
-            // Bind the endepoint.
-            _socket.Bind(endPoint);
             _cancelTokenSource = new();
+            _socket.Bind(endPoint);
             // Add the availables id's to the list.
             // This list is used to prevent the same id to be used twice.
             for (int id = 1; id <= Conf.MaxPlayers; id++)
@@ -546,6 +545,8 @@ namespace Atom.Core
                 catch (SocketException ex)
                 {
                     if (ex.ErrorCode == 10004)
+                        return;
+                    if (!IsServer && ex.ErrorCode == 10054)
                         return;
 
                     AtomLogger.LogStacktrace(ex);
