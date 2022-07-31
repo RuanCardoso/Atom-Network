@@ -42,6 +42,7 @@ namespace Atom.Core
 #endif
         public static AtomCore Module { get; private set; }
         public static AtomPooling<AtomStream> Streams { get; private set; }
+        public static AtomPooling<AtomStream> StreamsToWaitAck { get; private set; }
         public static double NetworkTime { get; private set; }
 
 #if UNITY_EDITOR
@@ -74,6 +75,7 @@ namespace Atom.Core
             NetworkTime = Time.timeAsDouble;
             LoadSettingsFile();
             Streams = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPool");
+            StreamsToWaitAck = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPoolToWaitAck");
         }
 
         private void Start()
