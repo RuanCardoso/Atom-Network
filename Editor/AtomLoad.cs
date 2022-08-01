@@ -14,6 +14,7 @@
 
 #if UNITY_EDITOR
 #if UNITY_2021_3_OR_NEWER
+using MarkupAttributes.Editor;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -49,6 +50,12 @@ namespace Atom.Core.Editor
         public int callbackOrder => 0;
         public void OnPreprocessBuild(BuildReport report) =>
             AtomLoad.Load();
+    }
+
+    [CustomEditor(typeof(Marked), true)]
+    class LoadMarked : MarkedUpEditor
+    {
+
     }
 }
 #endif

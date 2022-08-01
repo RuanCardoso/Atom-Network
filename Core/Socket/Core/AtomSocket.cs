@@ -218,8 +218,6 @@ namespace Atom.Core
                             }
                             else
                             {
-                                Relay(playerId);
-                                /****************************************************************/
                                 double timeOfClient = reader.ReadDouble();
                                 /****************************************************************/
                                 writer.Write((byte)Message.ConnectAndPing);
@@ -227,6 +225,7 @@ namespace Atom.Core
                                 writer.Write(AtomTime.LocalTime);
                                 /****************************************************************/
                                 SendToClient(writer, channelMode, targetMode, opMode, playerId);
+                                Relay(playerId);
                             }
                         }
                         else if (!isServer)
@@ -244,14 +243,13 @@ namespace Atom.Core
                             }
                             else
                             {
-                                Relay(playerId);
-                                /****************************************************************/
                                 double timeOfClient = reader.ReadDouble();
                                 double timeOfServer = reader.ReadDouble();
                                 /****************************************************************/
                                 AtomTime.SetTime(timeOfClient, timeOfServer);
                                 /****************************************************************/
                                 AtomTime.AddReceived();
+                                Relay(playerId);
                             }
                         }
                     }
@@ -344,20 +342,28 @@ namespace Atom.Core
                 Channel channel = _channelModes[channelIndex];
                 if (channel == Channel.Reliable || channel == Channel.ReliableAndOrderly)
                 {
-                    var messages = _channels[(playerId, (byte)channel)].MessagesToRelay.Values.ToList();
+                    var messages = _channels[(playerId, (byte)channel)].MessagesToRelay.ToList();
                     for (int messageIndex = 0; messageIndex < messages.Count; messageIndex++)
                     {
-                        AtomStream message = messages[messageIndex];
+                        AtomStream message = messages[messageIndex].Value;
                         if (message.PlayersToRelay.Count > 0)
                         {
-                            foreach (var (key, value) in message.PlayersToRelay)
+                            foreach (var (playerId_, _playerId) in message.PlayersToRelay)
                             {
                                 int countBytes = message.CountBytes;
                                 byte[] data = message.GetBuffer();
-                                Send(data, countBytes, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, value, 0, true);
+                                Send(data, countBytes, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, _playerId, 0, true);
+                                AtomLogger.Print($"Relaying message to {_playerId} {IsServer}");
                             }
                         }
-                        else StreamsToWaitAck.Push(message);
+                        else
+                        {
+                            if (_channels[(playerId, (byte)channel)].MessagesToRelay.TryRemove(messages[messageIndex].Key, out _))
+                            {
+                                message.Reset();
+                                StreamsToWaitAck.Push(message);
+                            }
+                        }
                     }
                 }
             }
@@ -384,8 +390,8 @@ namespace Atom.Core
                     AtomLogger.PrintError("[Atom] -> The message with the sequence " + seqAck + " already exists!");
             }
             // If the message is reliable, we need to add it to the waitAck list and wait for the ack!
-            if (isValid)
-                waitAck.PlayersToRelay.TryAdd(playerId, playerId);
+            if (isValid && !waitAck.PlayersToRelay.TryAdd(playerId, playerId))
+                AtomLogger.PrintError("[Atom] -> The player with the id " + playerId + " already exists!");
             /****************************************************************************************/
             lock (_lock)
             {
@@ -489,8 +495,7 @@ namespace Atom.Core
                                         if (opMode == Operation.Acknowledgement)
                                         {
                                             AtomClient peer = IsServer ? _clientsByEndPoint[_peerEndPoint] : _clientsById[playerId];
-                                            if (!atomChannel.MessagesToRelay[seqAck].PlayersToRelay.TryRemove(peer.Id, out _))
-                                                Debug.Log($"[Atom] -> The player " + peer.Id + $" is not in the list of players to relay. {IsServer}");
+                                            if (!atomChannel.MessagesToRelay[seqAck].PlayersToRelay.TryRemove(peer.Id, out _)) { }
                                         }
                                         else
                                         {
@@ -553,6 +558,7 @@ namespace Atom.Core
                     }
                 }
                 catch (ThreadAbortException) { }
+                catch (ObjectDisposedException) { }
                 catch (SocketException ex)
                 {
                     if (ex.ErrorCode == 10004)

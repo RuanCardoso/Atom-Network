@@ -218,7 +218,6 @@ namespace Atom.Core
 
         private static void OnChanged(object source, FileSystemEventArgs e) => Task.Run(async () =>
         {
-            await Task.Delay(3000);
             UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
         });
 #endif

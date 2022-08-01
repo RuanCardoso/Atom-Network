@@ -13,19 +13,13 @@
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
-using System;
 using UnityEngine;
 
-namespace Atom.Core.Attributes
+namespace Atom.Core
 {
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
-    public class LabelAttribute : PropertyAttribute
+    public class Marked : MonoBehaviour
     {
-        internal readonly string label;
-        public LabelAttribute(string label)
-        {
-            this.label = label;
-        }
+
     }
 }
 #endif

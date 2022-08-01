@@ -6,7 +6,6 @@ using UnityEngine;
 namespace MarkupAttributes.Editor
 {
     [CanEditMultipleObjects]
-    [CustomEditor(typeof(MonoBehaviour), true)]
     public class MarkedUpEditor : UnityEditor.Editor
     {
         private SerializedProperty[] allProps;

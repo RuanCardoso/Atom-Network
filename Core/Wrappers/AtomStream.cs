@@ -355,6 +355,8 @@ namespace Atom.Core.Wrappers
         {
             _memoryStream.Position = pos;
             _countBytes = countBytes;
+            /*****************************/
+            PlayersToRelay.Clear();
         }
 
         public void Seek(long offset, SeekOrigin seekOrigin)

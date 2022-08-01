@@ -25,7 +25,7 @@ namespace Atom.Core
 {
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(AtomNetwork))]
-    public class AtomCore : MonoBehaviour
+    public class AtomCore : Marked
     {
         public const byte CHANNEL_MASK = 0x3;
         public const byte OPERATION_MASK = 0x3;
@@ -48,24 +48,24 @@ namespace Atom.Core
 #if UNITY_EDITOR
 #if ATOM_BANDWIDTH_COUNTER
         [Box("Bandwidth")]
-        [Label("Timeout")][Range(1, 10)] public double BandwidthTimeout;
-        [Box("Bandwidth/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
+        [Label("Timeout")][Range(0.3f, 10f)] public double BandwidthTimeout;
+        [Box("Bandwidth/Server(Rec)")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string SERVER_REC_MSG_RATE = "0 Bytes/s";
-        [Box("Bandwidth/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
+        [Box("Bandwidth/Client(Rec)")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
 #endif
         [Box("Settings")]
         public string[] Addresses;
-        [NaughtyAttributes.InfoBox("Release mode is extremely slow, only use it on release builds!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
+        [NaughtyAttributes.InfoBox("IL2CPP: Release mode is extremely slow to build, only use it on release versions!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
         [NaughtyAttributes.InfoBox("ASCII is more bandwidth efficient!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
         [Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
-        [Range(1, MAX_PLAYERS)][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)][Label("Receive Size")] public int MaxPlayers;
+        [NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
         [NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
         [NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
         public int ReceiveTimeout;
         public int SendTimeout;
-        [Range(0.3f, 5f)] public float PingFrequency;
-        [Range(1, 128)] public int MaxStreamPool;
+        [Range(0.3f, 5f)][NaughtyAttributes.InfoBox("Messages are relayed with each ping request.")] public float PingFrequency;
+        public int MaxStreamPool;
         public bool BandwidthCounter;
         [Label("GC Incremental")] public bool IncrementalGc;
 #endif
@@ -75,7 +75,7 @@ namespace Atom.Core
             NetworkTime = Time.timeAsDouble;
             LoadSettingsFile();
             Streams = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPool");
-            StreamsToWaitAck = new(() => new(true, false, false), Conf.MaxStreamPool * 255, false, true, "AtomStreamPoolToWaitAck");
+            StreamsToWaitAck = new(() => new(true, false, false), Conf.MaxStreamPool * byte.MaxValue, false, true, "AtomStreamPoolToWaitAck");
         }
 
         private void Start()
@@ -91,7 +91,8 @@ namespace Atom.Core
         }
 
 #if UNITY_EDITOR
-        private void OnValidate()
+        [ContextMenu("Save Settings")]
+        private void Validate()
         {
             if (!Application.isPlaying)
             {
@@ -112,7 +113,6 @@ namespace Atom.Core
                     || !Conf.Addresses.SequenceEqual(Addresses);
                 if (isSave)
                 {
-                    AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
                     Conf.DebugMode = Build.ToString();
                     Conf.Encoding = _encoding_;
                     Conf.MaxUdpPacketSize = MaxUdpMessageSize;
