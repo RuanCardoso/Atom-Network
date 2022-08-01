@@ -14,7 +14,7 @@
 
 #if UNITY_2021_3_OR_NEWER
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using static Atom.Core.AtomGlobal;
 
@@ -22,7 +22,7 @@ namespace Atom.Core.Wrappers
 {
     public class AtomStream : IDisposable
     {
-        internal List<int> PlayersToRelay { get; } = new();
+        internal ConcurrentDictionary<int, int> PlayersToRelay { get; } = new();
         private int _countBytes;
         private readonly MemoryStream _memoryStream;
         private readonly byte[] _buffer;

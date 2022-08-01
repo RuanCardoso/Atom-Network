@@ -75,7 +75,7 @@ namespace Atom.Core
             NetworkTime = Time.timeAsDouble;
             LoadSettingsFile();
             Streams = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPool");
-            StreamsToWaitAck = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPoolToWaitAck");
+            StreamsToWaitAck = new(() => new(true, false, false), Conf.MaxStreamPool * 255, false, true, "AtomStreamPoolToWaitAck");
         }
 
         private void Start()
