@@ -6,7 +6,7 @@ Preset:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: AtomCore_Client
+  m_Name: Client
   m_TargetType:
     m_NativeTypeID: 114
     m_ManagedTypePPtr: {fileID: 11500000, guid: 4af19e53fbf55e24990b7cb868f2f06a, type: 3}
@@ -66,19 +66,19 @@ Preset:
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: MaxUdpMessageSize
-    value: 128
+    value: 256
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: MaxPlayers
-    value: 16320
+    value: 16
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: MaxRecBuffer
-    value: 1024
+    value: 2048
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: MaxSendBuffer
-    value: 1024
+    value: 2048
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: ReceiveTimeout
@@ -94,7 +94,7 @@ Preset:
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: MaxStreamPool
-    value: 128
+    value: 12
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: BandwidthCounter

@@ -32,6 +32,7 @@ namespace Atom.Core.Wrappers
         private readonly bool _fixedSize;
         private readonly bool _readOnly;
         private readonly bool _writerOnly;
+        private DateTime _lastTime;
 
         public long Position
         {
@@ -43,6 +44,7 @@ namespace Atom.Core.Wrappers
         public int Size => _size;
         public int CountBytes => _countBytes;
         public int BytesRemaining => (int)(CountBytes - Position);
+        public DateTime LastTime { get => _lastTime; set => _lastTime = value; }
 
         public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
         {

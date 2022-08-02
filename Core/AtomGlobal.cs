@@ -216,10 +216,7 @@ namespace Atom.Core
             watcher.EnableRaisingEvents = true;
         }
 
-        private static void OnChanged(object source, FileSystemEventArgs e) => Task.Run(async () =>
-        {
-            UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
-        });
+        private static void OnChanged(object source, FileSystemEventArgs e) => UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
 #endif
     }
 }

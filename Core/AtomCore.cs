@@ -134,10 +134,6 @@ namespace Atom.Core
 
         private void Reset()
         {
-            if (!Application.isPlaying)
-                SaveSettingsFile();
-
-            AtomLogger.Print("Wait for save settings... 3 seconds.....Don't play!");
             Build = Enum.Parse<BuildMode>(Conf.DebugMode);
             Encoding = Enum.Parse<EncodingType>(Conf.Encoding.Replace("UTF-8", "UTF8").Replace("UTF-16", "UTF16").Replace("UTF-32", "UTF32"));
             MaxUdpMessageSize = Conf.MaxUdpPacketSize;
