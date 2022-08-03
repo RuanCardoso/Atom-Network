@@ -413,6 +413,9 @@ namespace Atom.Core
                             {
                                 foreach (var client in _clientsById.Values.ToArray())
                                 {
+                                    if (!client.IsConnected)
+                                        return;
+
                                     endPoint = _clientsById[client.Id].EndPoint;
                                     if (isValid)
                                         waitAck.PlayersToRelay.TryAdd(client.Id, client.Id);
