@@ -25,7 +25,7 @@ namespace Atom.Core
 {
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(AtomNetwork))]
-    public class AtomCore : Marked
+    public class AtomCore : MarkedUp
     {
         public const byte CHANNEL_MASK = 0x3;
         public const byte OPERATION_MASK = 0x3;
@@ -50,27 +50,33 @@ namespace Atom.Core
 
 #if UNITY_EDITOR
 #if ATOM_BANDWIDTH_COUNTER
-        [Box("Bandwidth")]
+        [Foldout("Bandwidth Manager")]
         [Label("Timeout")][Range(0.3f, 10f)] public double BandwidthTimeout;
-        [Box("Bandwidth/Server(Rec)")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
+        [Foldout("Bandwidth Manager/Download", true)]
+        [Box("Bandwidth Manager/Download/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string SERVER_REC_MSG_RATE = "0 Bytes/s";
-        [Box("Bandwidth/Client(Rec)")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
+        [Box("Bandwidth Manager/Download/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_REC_BYTES_RATE = "0 Bytes/s";
         [Label("Message Rate")][ReadOnly] public string CLIENT_REC_MSG_RATE = "0 Bytes/s";
+        [Foldout("Bandwidth Manager/Upload", true)]
+        [Box("Bandwidth Manager/Upload/Server")][Label("Byte Rate")][ReadOnly] public string SERVER_SENT_BYTES_RATE = "0 Bytes/s";
+        [Label("Message Rate")][ReadOnly] public string SERVER_SENT_MSG_RATE = "0 Bytes/s";
+        [Box("Bandwidth Manager/Upload/Client")][Label("Bytes Rate")][ReadOnly] public string CLIENT_SENT_BYTES_RATE = "0 Bytes/s";
+        [Label("Message Rate")][ReadOnly] public string CLIENT_SENT_MSG_RATE = "0 Bytes/s";
 #endif
-        [Box("Settings")]
-        public string[] Addresses;
-        [NaughtyAttributes.InfoBox("IL2CPP: Release mode is extremely slow to build, only use it on release versions!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
-        [NaughtyAttributes.InfoBox("ASCII is more bandwidth efficient!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
-        [Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
-        [NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
-        [NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
-        [NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
-        public int ReceiveTimeout;
-        public int SendTimeout;
-        [Range(0.3f, 5f)][NaughtyAttributes.InfoBox("Messages are relayed with each ping request.")] public float PingFrequency;
-        public int MaxStreamPool;
-        public bool BandwidthCounter;
-        [Label("GC Incremental")] public bool IncrementalGc;
+        [Foldout("Settings Manager")]
+        [Box("Settings Manager/Client")] public string[] Addresses;
+        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("IL2CPP: Release mode is extremely slow to build, only use it on release versions!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
+        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("ASCII is more bandwidth efficient!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
+        [Box("Settings Manager/Global")][Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
+        [Box("Settings Manager/Server")][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
+        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
+        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
+        [Box("Settings Manager/Global")] public int ReceiveTimeout;
+        [Box("Settings Manager/Global")] public int SendTimeout;
+        [Box("Settings Manager/Client")][Range(0.3f, 5f)][NaughtyAttributes.InfoBox("Messages are relayed with each ping request.")] public float PingFrequency;
+        [Box("Settings Manager/Global")] public int MaxStreamPool;
+        [Box("Settings Manager/Global")] public bool BandwidthCounter;
+        [Box("Settings Manager/Global")][Label("GC Incremental")] public bool IncrementalGc;
 #endif
         private void Awake()
         {
@@ -107,9 +113,9 @@ namespace Atom.Core
                     || Conf.MaxRecBuffer != MaxRecBuffer
                     || Conf.MaxSendBuffer != MaxSendBuffer
                     || Conf.MaxStreamPool != MaxStreamPool
-                    #if ATOM_BANDWIDTH_COUNTER
+#if ATOM_BANDWIDTH_COUNTER
                     || Conf.BandwidthTimeout != BandwidthTimeout
-                    #endif
+#endif
                     || Conf.BandwidthCounter != BandwidthCounter
                     || Conf.IncrementalGc != IncrementalGc
                     || Conf.ReceiveTimeout != ReceiveTimeout
@@ -125,9 +131,9 @@ namespace Atom.Core
                     Conf.MaxRecBuffer = MaxRecBuffer;
                     Conf.MaxSendBuffer = MaxSendBuffer;
                     Conf.MaxStreamPool = MaxStreamPool;
-                    #if ATOM_BANDWIDTH_COUNTER
+#if ATOM_BANDWIDTH_COUNTER
                     Conf.BandwidthTimeout = BandwidthTimeout;
-                    #endif
+#endif
                     Conf.BandwidthCounter = BandwidthCounter;
                     Conf.IncrementalGc = IncrementalGc;
                     Conf.ReceiveTimeout = ReceiveTimeout;
@@ -148,9 +154,9 @@ namespace Atom.Core
             MaxRecBuffer = Conf.MaxRecBuffer;
             MaxSendBuffer = Conf.MaxSendBuffer;
             MaxStreamPool = Conf.MaxStreamPool;
-            #if ATOM_BANDWIDTH_COUNTER
+#if ATOM_BANDWIDTH_COUNTER
             BandwidthTimeout = Conf.BandwidthTimeout;
-            #endif
+#endif
             BandwidthCounter = Conf.BandwidthCounter;
             IncrementalGc = Conf.IncrementalGc;
             ReceiveTimeout = Conf.ReceiveTimeout;

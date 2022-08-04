@@ -17,7 +17,12 @@ using UnityEngine;
 
 namespace Atom.Core
 {
-    public class Marked : MonoBehaviour
+    public class MarkedUp : MonoBehaviour
+    {
+
+    }
+
+    public class MarkedDown : MonoBehaviour
     {
 
     }

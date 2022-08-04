@@ -15,6 +15,7 @@
 #if UNITY_EDITOR
 #if UNITY_2021_3_OR_NEWER
 using MarkupAttributes.Editor;
+using NaughtyAttributes.Editor;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -52,8 +53,14 @@ namespace Atom.Core.Editor
             AtomLoad.Load();
     }
 
-    [CustomEditor(typeof(Marked), true)]
+    [CustomEditor(typeof(MarkedUp), true)]
     class LoadMarked : MarkedUpEditor
+    {
+
+    }
+
+    [CustomEditor(typeof(MarkedDown), true)]
+    class LoadMarkedTwo : NaughtyInspector
     {
 
     }
