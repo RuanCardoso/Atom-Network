@@ -43,7 +43,6 @@ using Atom.Core.Interface;
 using Atom.Core.Wrappers;
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -102,6 +101,7 @@ namespace Atom.Core
         /// <summary>The list to store the connected clients. </summary>
         private readonly Dictionary<EndPoint, AtomClient> _clientsByEndPoint = new(); // Thread safe, no need to lock, does not have simultaneous access.
         private readonly Dictionary<int, AtomClient> _clientsById = new(); // Thread safe, no need to lock, it's readonly.
+        private readonly List<AtomClient> _clientsByIdToList = new(); // Thread safe, no need to lock, it's readonly.
         /// <summary> Store the information of the channels. </summary>
         private readonly Dictionary<(int, byte), AtomChannel> _channels = new(); // Thread safe, no need to lock, it's readonly.
         /// <summary>List of exlusive id's, used to prevent the same id to be used twice.</summary>
@@ -135,6 +135,7 @@ namespace Atom.Core
                 // Pre-alloc memory!
                 _clientsById.Add(idOfPlayer, new(idOfPlayer)); // Thread safe after the initialization, because it's readonly.
             }
+            _clientsByIdToList.AddRange(_clientsById.Values);
             // Sort the id's to prevent the same id to be used twice.
             _ids.Sort();
         }
@@ -215,7 +216,7 @@ namespace Atom.Core
                                     {
                                         if (_channels[(pId, (byte)channel)].MessagesToRelay.TryRemove(messages[messageIndex].Key, out _))
                                         {
-                                            message.Reset();
+                                            message.PlayersToRelay.Clear();
                                             StreamsToWaitAck.Push(message);
                                         }
                                     }
@@ -388,7 +389,7 @@ namespace Atom.Core
             bool isReliable = channel == Channel.Reliable || channel == Channel.ReliableAndOrderly;
             bool isValid = isReliable && !isRelay && operation != Operation.Acknowledgement;
             EndPoint endPoint = IsServer ? _clientsById[playerId].EndPoint : _destEndPoint;
-            /****************************************************************************************/
+            /*************************************************************************************************************************************/
             AtomStream waitAck = default;
             // Used to relay messages to peers!
             // If the message is unreliable, we just send it.
@@ -402,7 +403,7 @@ namespace Atom.Core
                 if (!atomChannel.MessagesToRelay.TryAdd(seqAck, waitAck))
                     AtomLogger.PrintError("[Atom] -> The message with the sequence " + seqAck + " already exists!");
             }
-            /****************************************************************************************/
+            /*************************************************************************************************************************************/
             lock (_lock)
             {
                 if (IsServer)
@@ -411,8 +412,9 @@ namespace Atom.Core
                     {
                         case Target.All:
                             {
-                                foreach (var client in _clientsById.Values.ToArray())
+                                for (int i = 0; i < _clientsByIdToList.Count; i++)
                                 {
+                                    AtomClient client = _clientsByIdToList[i];
                                     if (!client.IsConnected)
                                         return;
 
