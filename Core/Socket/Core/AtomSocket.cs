@@ -366,6 +366,8 @@ namespace Atom.Core
             messageStream.Write((ushort)playerId);
 #elif ATOM_INT_PLAYER_ID
             messageStream.Write((int)playerId);
+#else
+            messageStream.Write((byte)playerId);
 #endif
             AtomChannel atomChannel = default;
             if (channelMode == Channel.Reliable || channelMode == Channel.ReliableAndOrderly)
@@ -509,6 +511,8 @@ namespace Atom.Core
                             int playerId = message.ReadUShort();
 #elif ATOM_INT_PLAYER_ID
                             int playerId = message.ReadInt();
+#else
+                            int playerId = message.ReadByte();
 #endif
                             Channel channelMode = (Channel)(byte)(ENCODED_HEADER & CHANNEL_MASK);
                             Target targetMode = (Target)(byte)((ENCODED_HEADER >> 2) & TARGET_MASK);

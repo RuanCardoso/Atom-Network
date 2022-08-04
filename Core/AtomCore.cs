@@ -39,6 +39,9 @@ namespace Atom.Core
 #elif ATOM_INT_PLAYER_ID
         public const int RELIABLE_SIZE = 9;
         public const int UNRELIABLE_SIZE = 5;
+#else
+        public const int RELIABLE_SIZE = 6;
+        public const int UNRELIABLE_SIZE = 2;
 #endif
         public static AtomCore Module { get; private set; }
         public static AtomPooling<AtomStream> Streams { get; private set; }
@@ -104,7 +107,9 @@ namespace Atom.Core
                     || Conf.MaxRecBuffer != MaxRecBuffer
                     || Conf.MaxSendBuffer != MaxSendBuffer
                     || Conf.MaxStreamPool != MaxStreamPool
+                    #if ATOM_BANDWIDTH_COUNTER
                     || Conf.BandwidthTimeout != BandwidthTimeout
+                    #endif
                     || Conf.BandwidthCounter != BandwidthCounter
                     || Conf.IncrementalGc != IncrementalGc
                     || Conf.ReceiveTimeout != ReceiveTimeout
@@ -120,7 +125,9 @@ namespace Atom.Core
                     Conf.MaxRecBuffer = MaxRecBuffer;
                     Conf.MaxSendBuffer = MaxSendBuffer;
                     Conf.MaxStreamPool = MaxStreamPool;
+                    #if ATOM_BANDWIDTH_COUNTER
                     Conf.BandwidthTimeout = BandwidthTimeout;
+                    #endif
                     Conf.BandwidthCounter = BandwidthCounter;
                     Conf.IncrementalGc = IncrementalGc;
                     Conf.ReceiveTimeout = ReceiveTimeout;
@@ -141,7 +148,9 @@ namespace Atom.Core
             MaxRecBuffer = Conf.MaxRecBuffer;
             MaxSendBuffer = Conf.MaxSendBuffer;
             MaxStreamPool = Conf.MaxStreamPool;
+            #if ATOM_BANDWIDTH_COUNTER
             BandwidthTimeout = Conf.BandwidthTimeout;
+            #endif
             BandwidthCounter = Conf.BandwidthCounter;
             IncrementalGc = Conf.IncrementalGc;
             ReceiveTimeout = Conf.ReceiveTimeout;
