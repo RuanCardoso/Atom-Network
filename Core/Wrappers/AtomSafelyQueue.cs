@@ -89,8 +89,11 @@ namespace Atom.Core.Wrappers
                     if (values.Count > 0)
                     {
                         _queue.Clear();
-                        foreach (var value in values)
+                        for (int i = 0; i < values.Count; i++)
+                        {
+                            T value = values[i];
                             _queue.Enqueue(value);
+                        }
                     }
                 }
             }

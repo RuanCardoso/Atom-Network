@@ -30,7 +30,7 @@ namespace Atom.Core.Wrappers
         {
             _createNewObjectIfNotAvailable = createNewObjectIfNotAvailable;
             _generator = generator;
-            _queue = new(capacity);
+            _queue = new(0);
             _name = name;
 
             if (fillPool)
