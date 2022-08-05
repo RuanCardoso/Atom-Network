@@ -206,7 +206,7 @@ namespace Atom.Core
                                     {
                                         foreach (var (playerId_, _playerId) in message.PlayersToRelay.ToList())
                                         {
-                                            int countBytes = message.CountBytes;
+                                            int countBytes = message.BytesWritten;
                                             byte[] data = message.GetBuffer();
                                             Send(data, countBytes, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, _playerId, 0, true);
                                             AtomLogger.Print($"Relaying message to {_playerId} {IsServer}");
@@ -347,10 +347,10 @@ namespace Atom.Core
             var data = messageStream.GetBuffer();
             int defSize = (channelMode == Channel.ReliableAndOrderly || channelMode == Channel.Reliable) ? RELIABLE_SIZE : UNRELIABLE_SIZE;
 #if ATOM_DEBUG
-            if (messageStream.FixedSize && (data.Length + defSize) != messageStream.Size)
-                throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + messageStream.Size + " but you need " + (data.Length + defSize) + ".");
+            if (messageStream.FixedSize && (data.Length + defSize) != messageStream.Length)
+                throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + messageStream.Length + " but you need " + (data.Length + defSize) + ".");
 #endif
-            int countBytes = messageStream.CountBytes;
+            int countBytes = messageStream.BytesWritten;
             messageStream.Reset(pos: defSize);
             messageStream.Write(data, 0, countBytes);
             messageStream.Position = 0;
@@ -378,9 +378,9 @@ namespace Atom.Core
                 messageStream.Write(seqAck);
             }
             /*************************************************************************************/
-            messageStream.Position = messageStream.CountBytes;
+            messageStream.Position = messageStream.BytesWritten;
             byte[] _data = messageStream.GetBuffer();
-            countBytes = messageStream.CountBytes;
+            countBytes = messageStream.BytesWritten;
             Send(_data, countBytes, targetMode, channelMode, opMode, playerId, seqAck, false);
         }
 

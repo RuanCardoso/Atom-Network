@@ -62,17 +62,28 @@ namespace Atom.Core
 #endif
         }
 
+        private static void ThrowIf()
+        {
+            if (_instance == null)
+                throw new Exception("You must initialize the AtomNetwork before using it.");
+            if (_instance._client == null)
+                throw new Exception("You can't use the client instance on the server side!");
+        }
+
 #pragma warning disable IDE1006
         public static void gRPC(byte id, AtomStream writer, Channel channel = Channel.Unreliable, Target target = Target.Single, int playerId = 0)
         {
-            int count = writer.CountBytes;
+            int count = writer.BytesWritten;
             byte[] data = writer.GetBuffer();
             writer.Reset(pos: sizeof(byte) * 2);
             data.Write(writer, 0, count);
             writer.Position = 0;
             ((byte)Message.gRPC).Write(writer);
             id.Write(writer);
-            writer.Position = writer.CountBytes;
+            writer.Position = writer.BytesWritten;
+#if ATOM_DEBUG
+            ThrowIf();
+#endif
             if (playerId == 0) _instance._client.SendToServer(writer, channel, target);
             else _instance._server.SendToClient(writer, channel, target, playerId: playerId);
         }
@@ -87,10 +98,12 @@ namespace Atom.Core
                 {
                     case Message.gRPC:
                         byte id = reader.ReadByte();
+                        byte[] data = reader.ReadNext(out int length);
+                        if (isServer)
+                            writer.Write(data, 0, length);
                         if (AtomBehaviour.gRPCMethods.TryGetValue(id, out Action<AtomStream, bool, int> gRPC))
                         {
                             AtomStream gRPCStream = AtomStream.Get();
-                            byte[] data = reader.ReadNext(out int length);
                             gRPCStream.SetBuffer(data, 0, length);
                             gRPC(gRPCStream, isServer, playerId);
                             if (isServer)
@@ -100,6 +113,8 @@ namespace Atom.Core
                         {
                             if (isServer)
                                 AtomNetwork.gRPC(id, writer, channel, target, playerId);
+                            else
+                                AtomLogger.PrintError($"gRPC method not found: {id} -> Do you inherit from the AtomBehaviour class?");
                         }
                         break;
                 }

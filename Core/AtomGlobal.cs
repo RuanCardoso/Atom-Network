@@ -49,7 +49,7 @@ namespace Atom.Core
         [Key(8)]
         public int SendTimeout = -1;
         [Key(9)]
-        public int MaxStreamPool = 12;
+        public int UnreliableStreamPool = 128;
         [Key(10)]
         public double BandwidthTimeout = 2;
         [Key(11)]
@@ -58,6 +58,10 @@ namespace Atom.Core
         public bool BandwidthCounter = true;
         [Key(13)]
         public bool IncrementalGc = true;
+        [Key(14)]
+        public int ReliableStreamPool = 128;
+        [Key(15)]
+        public bool AutoAllocStreams = false;
     }
 
     public class AtomGlobal

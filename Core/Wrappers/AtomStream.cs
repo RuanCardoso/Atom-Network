@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using UnityEngine;
 using static Atom.Core.AtomGlobal;
 
 namespace Atom.Core.Wrappers
@@ -30,6 +31,7 @@ namespace Atom.Core.Wrappers
         private readonly bool _reuse;
         private readonly int _size;
         private readonly bool _fixedSize;
+        private readonly bool _fixedAutoSize;
         private readonly bool _readOnly;
         private readonly bool _writerOnly;
         private DateTime _lastTime;
@@ -41,14 +43,26 @@ namespace Atom.Core.Wrappers
         }
 
         public bool FixedSize => _fixedSize;
-        public int Size => _size;
-        public int CountBytes => _countBytes;
-        public int BytesRemaining => (int)(CountBytes - Position);
+        public int Length => _size;
+        public int BytesWritten => _countBytes;
+        public int BytesRemaining => (int)(BytesWritten - Position);
         public DateTime LastTime { get => _lastTime; set => _lastTime = value; }
+
+        public AtomStream()
+        {
+            _fixedSize = false;
+            _fixedAutoSize = true;
+            _size = Conf.MaxUdpPacketSize;
+            _memoryBuffer = new byte[_size];
+            _memoryStream = new(_memoryBuffer, 0, _size);
+            _buffer = new byte[_size];
+            _reuse = false;
+        }
 
         public AtomStream(bool reuse = false, bool readOnly = false, bool writerOnly = false)
         {
             _fixedSize = false;
+            _fixedAutoSize = false;
             _size = Conf.MaxUdpPacketSize;
             _memoryBuffer = new byte[_size];
             _memoryStream = new(_memoryBuffer, 0, _size);
@@ -58,14 +72,77 @@ namespace Atom.Core.Wrappers
             _writerOnly = writerOnly;
         }
 
-        public AtomStream(int size) // Zero allocations with size!
+        public AtomStream(int size)
         {
             _fixedSize = true;
+            _fixedAutoSize = false;
             _size = size;
             _memoryBuffer = new byte[_size];
             _memoryStream = new(_memoryBuffer, 0, _size);
             _buffer = new byte[_size];
             _reuse = false;
+        }
+
+        public void Write(Vector3 vec3)
+        {
+            Write(vec3.x);
+            Write(vec3.y);
+            Write(vec3.z);
+        }
+
+        public void Write(Vector2 vec2)
+        {
+            Write(vec2.x);
+            Write(vec2.y);
+        }
+
+        public void Write(Quaternion quat)
+        {
+            Write(quat.x);
+            Write(quat.y);
+            Write(quat.z);
+            Write(quat.w);
+        }
+
+        public void Write(Color color)
+        {
+            Write(color.r);
+            Write(color.g);
+            Write(color.b);
+            Write(color.a);
+        }
+
+        public Vector3 ReadVector3()
+        {
+            float x = ReadFloat();
+            float y = ReadFloat();
+            float z = ReadFloat();
+            return new Vector3(x, y, z);
+        }
+
+        public Vector2 ReadVector2()
+        {
+            float x = ReadFloat();
+            float y = ReadFloat();
+            return new Vector2(x, y);
+        }
+
+        public Quaternion ReadQuaternion()
+        {
+            float x = ReadFloat();
+            float y = ReadFloat();
+            float z = ReadFloat();
+            float w = ReadFloat();
+            return new Quaternion(x, y, z, w);
+        }
+
+        public Color ReadColor()
+        {
+            float r = ReadFloat();
+            float g = ReadFloat();
+            float b = ReadFloat();
+            float a = ReadFloat();
+            return new Color(r, g, b, a);
         }
 
         public void Write(byte value)
@@ -369,7 +446,7 @@ namespace Atom.Core.Wrappers
         {
             if (!_reuse)
             {
-                if (!_fixedSize)
+                if (!_fixedSize && !_fixedAutoSize)
                 {
                     if (!_disposable)
                     {

@@ -36,8 +36,8 @@ namespace Atom.Core.Formatters.Atom.Core
         private static global::System.ReadOnlySpan<byte> GetSpan_ReceiveTimeout() => new byte[1 + 14] { 174, 82, 101, 99, 101, 105, 118, 101, 84, 105, 109, 101, 111, 117, 116 };
         // SendTimeout
         private static global::System.ReadOnlySpan<byte> GetSpan_SendTimeout() => new byte[1 + 11] { 171, 83, 101, 110, 100, 84, 105, 109, 101, 111, 117, 116 };
-        // MaxStreamPool
-        private static global::System.ReadOnlySpan<byte> GetSpan_MaxStreamPool() => new byte[1 + 13] { 173, 77, 97, 120, 83, 116, 114, 101, 97, 109, 80, 111, 111, 108 };
+        // UnreliableStreamPool
+        private static global::System.ReadOnlySpan<byte> GetSpan_UnreliableStreamPool() => new byte[1 + 20] { 180, 85, 110, 114, 101, 108, 105, 97, 98, 108, 101, 83, 116, 114, 101, 97, 109, 80, 111, 111, 108 };
         // BandwidthTimeout
         private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthTimeout() => new byte[1 + 16] { 176, 66, 97, 110, 100, 119, 105, 100, 116, 104, 84, 105, 109, 101, 111, 117, 116 };
         // PingFrequency
@@ -46,6 +46,10 @@ namespace Atom.Core.Formatters.Atom.Core
         private static global::System.ReadOnlySpan<byte> GetSpan_BandwidthCounter() => new byte[1 + 16] { 176, 66, 97, 110, 100, 119, 105, 100, 116, 104, 67, 111, 117, 110, 116, 101, 114 };
         // IncrementalGc
         private static global::System.ReadOnlySpan<byte> GetSpan_IncrementalGc() => new byte[1 + 13] { 173, 73, 110, 99, 114, 101, 109, 101, 110, 116, 97, 108, 71, 99 };
+        // ReliableStreamPool
+        private static global::System.ReadOnlySpan<byte> GetSpan_ReliableStreamPool() => new byte[1 + 18] { 178, 82, 101, 108, 105, 97, 98, 108, 101, 83, 116, 114, 101, 97, 109, 80, 111, 111, 108 };
+        // AutoAllocStreams
+        private static global::System.ReadOnlySpan<byte> GetSpan_AutoAllocStreams() => new byte[1 + 16] { 176, 65, 117, 116, 111, 65, 108, 108, 111, 99, 83, 116, 114, 101, 97, 109, 115 };
 
         public void Serialize(ref global::MessagePack.MessagePackWriter writer, global::Atom.Core.AtomSettings value, global::MessagePack.MessagePackSerializerOptions options)
         {
@@ -56,7 +60,7 @@ namespace Atom.Core.Formatters.Atom.Core
             }
 
             var formatterResolver = options.Resolver;
-            writer.WriteMapHeader(14);
+            writer.WriteMapHeader(16);
             writer.WriteRaw(GetSpan_Addresses());
             global::MessagePack.FormatterResolverExtensions.GetFormatterWithVerify<string[]>(formatterResolver).Serialize(ref writer, value.Addresses, options);
             writer.WriteRaw(GetSpan_DebugMode());
@@ -75,8 +79,8 @@ namespace Atom.Core.Formatters.Atom.Core
             writer.Write(value.ReceiveTimeout);
             writer.WriteRaw(GetSpan_SendTimeout());
             writer.Write(value.SendTimeout);
-            writer.WriteRaw(GetSpan_MaxStreamPool());
-            writer.Write(value.MaxStreamPool);
+            writer.WriteRaw(GetSpan_UnreliableStreamPool());
+            writer.Write(value.UnreliableStreamPool);
             writer.WriteRaw(GetSpan_BandwidthTimeout());
             writer.Write(value.BandwidthTimeout);
             writer.WriteRaw(GetSpan_PingFrequency());
@@ -85,6 +89,10 @@ namespace Atom.Core.Formatters.Atom.Core
             writer.Write(value.BandwidthCounter);
             writer.WriteRaw(GetSpan_IncrementalGc());
             writer.Write(value.IncrementalGc);
+            writer.WriteRaw(GetSpan_ReliableStreamPool());
+            writer.Write(value.ReliableStreamPool);
+            writer.WriteRaw(GetSpan_AutoAllocStreams());
+            writer.Write(value.AutoAllocStreams);
         }
 
         public global::Atom.Core.AtomSettings Deserialize(ref global::MessagePack.MessagePackReader reader, global::MessagePack.MessagePackSerializerOptions options)
@@ -152,6 +160,12 @@ namespace Atom.Core.Formatters.Atom.Core
                                         continue;
                                 }
 
+                            case 8028911263993328961UL:
+                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 8317411175162991459UL) { goto FAIL; }
+
+                                ____result.AutoAllocStreams = reader.ReadBoolean();
+                                continue;
+
                         }
                     case 10:
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_MaxPlayers().Slice(1))) { goto FAIL; }
@@ -171,12 +185,6 @@ namespace Atom.Core.Formatters.Atom.Core
                                 if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 491327481461UL) { goto FAIL; }
 
                                 ____result.MaxSendBuffer = reader.ReadInt32();
-                                continue;
-
-                            case 7018141438268957005UL:
-                                if (global::MessagePack.Internal.AutomataKeyGen.GetKey(ref stringKey) != 465726034029UL) { goto FAIL; }
-
-                                ____result.MaxStreamPool = reader.ReadInt32();
                                 continue;
 
                             case 8171062745642199376UL:
@@ -201,6 +209,16 @@ namespace Atom.Core.Formatters.Atom.Core
                         if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_SendTimeout().Slice(1))) { goto FAIL; }
 
                         ____result.SendTimeout = reader.ReadInt32();
+                        continue;
+                    case 20:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_UnreliableStreamPool().Slice(1))) { goto FAIL; }
+
+                        ____result.UnreliableStreamPool = reader.ReadInt32();
+                        continue;
+                    case 18:
+                        if (!global::System.MemoryExtensions.SequenceEqual(stringKey, GetSpan_ReliableStreamPool().Slice(1))) { goto FAIL; }
+
+                        ____result.ReliableStreamPool = reader.ReadInt32();
                         continue;
 
                 }

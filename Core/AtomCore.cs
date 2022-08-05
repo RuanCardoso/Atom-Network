@@ -64,27 +64,37 @@ namespace Atom.Core
         [Label("Message Rate")][ReadOnly] public string CLIENT_SENT_MSG_RATE = "0 Bytes/s";
 #endif
         [Foldout("Settings Manager")]
-        [Box("Settings Manager/Client")] public string[] Addresses;
-        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("IL2CPP: Release mode is extremely slow to build, only use it on release versions!", NaughtyAttributes.EInfoBoxType.Normal)] public BuildMode Build;
-        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("ASCII is more bandwidth efficient!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
-        [Box("Settings Manager/Global")][Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
-        [Box("Settings Manager/Server")][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
-        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Receive Size")] public int MaxRecBuffer;
-        [Box("Settings Manager/Global")][NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)][Label("Send Size")] public int MaxSendBuffer;
-        [Box("Settings Manager/Global")] public int ReceiveTimeout;
-        [Box("Settings Manager/Global")] public int SendTimeout;
-        [Box("Settings Manager/Client")][Range(0.3f, 5f)][NaughtyAttributes.InfoBox("Messages are relayed with each ping request.")] public float PingFrequency;
-        [Box("Settings Manager/Global")] public int MaxStreamPool;
-        [Box("Settings Manager/Global")] public bool BandwidthCounter;
-        [Box("Settings Manager/Global")][Label("GC Incremental")] public bool IncrementalGc;
+        [Foldout("Settings Manager/Global")]
+        [NaughtyAttributes.InfoBox("IL2CPP: Release mode is extremely slow to build, only use it on release versions!", NaughtyAttributes.EInfoBoxType.Normal)]
+        [Foldout("Settings Manager/Global/Others")] public BuildMode Build;
+        [NaughtyAttributes.InfoBox("ASCII is recommended for low bandwidth usage!", NaughtyAttributes.EInfoBoxType.Normal)] public EncodingType Encoding;
+        public bool BandwidthCounter;
+        [Label("GC Incremental")] public bool IncrementalGc;
+        [NaughtyAttributes.InfoBox("Some values will directly influence the use of RAM memory!!", NaughtyAttributes.EInfoBoxType.Warning)]
+        [NaughtyAttributes.InfoBox("All properties can have different values between server and client!", NaughtyAttributes.EInfoBoxType.Normal)]
+        [Foldout("Settings Manager/Global/Socket")][Label("Max Message Size")][Range(1, 1532)][NaughtyAttributes.InfoBox("This value directly influences packet drop!", NaughtyAttributes.EInfoBoxType.Warning)] public int MaxUdpMessageSize;
+        [NaughtyAttributes.InfoBox("An inappropriate size can drop packets, even on a localhost!", NaughtyAttributes.EInfoBoxType.Warning)]
+        [Label("Receive Size")] public int MaxRecBuffer;
+        [NaughtyAttributes.InfoBox("An inappropriate size can delay sending data!", NaughtyAttributes.EInfoBoxType.Warning)]
+        [Label("Send Size")] public int MaxSendBuffer;
+        public int ReceiveTimeout;
+        public int SendTimeout;
+        [NaughtyAttributes.InfoBox("Avoid using items from the pool to avoid allocating new objects when there are no items available!", NaughtyAttributes.EInfoBoxType.Warning)]
+        [Foldout("Settings Manager/Global/Pools")][Label("Unreliable Streams")] public int UnreliableMaxStreamPool;
+        [Label("Reliable Streams")] public int ReliableMaxStreamPool;
+        [NaughtyAttributes.InfoBox("It can significantly affect performance!", NaughtyAttributes.EInfoBoxType.Warning)]
+        [Label("Auto Resize Pool")] public bool AutoAllocateStreams;
+        [Foldout("Settings Manager/Client")] public string[] Addresses;
+        [Range(0.1f, 10f)] public float PingFrequency;
+        [Foldout("Settings Manager/Server")][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
 #endif
         private void Awake()
         {
             Module = this;
             NetworkTime = Time.timeAsDouble;
             LoadSettingsFile();
-            Streams = new(() => new(true, false, false), Conf.MaxStreamPool, false, true, "AtomStreamPool");
-            StreamsToWaitAck = new(() => new(true, false, false), Conf.MaxStreamPool * byte.MaxValue, false, true, "AtomStreamPoolToWaitAck");
+            Streams = new(() => new(true, false, false), Conf.UnreliableStreamPool, Conf.AutoAllocStreams, true, "AtomStreamPool");
+            StreamsToWaitAck = new(() => new(true, false, false), Conf.ReliableStreamPool, Conf.AutoAllocStreams, true, "AtomStreamPoolToWaitAck");
         }
 
         private void Start()
@@ -112,7 +122,7 @@ namespace Atom.Core
                     || Conf.MaxPlayers != MaxPlayers
                     || Conf.MaxRecBuffer != MaxRecBuffer
                     || Conf.MaxSendBuffer != MaxSendBuffer
-                    || Conf.MaxStreamPool != MaxStreamPool
+                    || Conf.UnreliableStreamPool != UnreliableMaxStreamPool
 #if ATOM_BANDWIDTH_COUNTER
                     || Conf.BandwidthTimeout != BandwidthTimeout
 #endif
@@ -121,7 +131,9 @@ namespace Atom.Core
                     || Conf.ReceiveTimeout != ReceiveTimeout
                     || Conf.SendTimeout != SendTimeout
                     || Conf.PingFrequency != PingFrequency
-                    || !Conf.Addresses.SequenceEqual(Addresses);
+                    || !Conf.Addresses.SequenceEqual(Addresses)
+                    || Conf.ReliableStreamPool != ReliableMaxStreamPool
+                    || Conf.AutoAllocStreams != AutoAllocateStreams;
                 if (isSave)
                 {
                     Conf.DebugMode = Build.ToString();
@@ -130,7 +142,8 @@ namespace Atom.Core
                     Conf.MaxPlayers = MaxPlayers;
                     Conf.MaxRecBuffer = MaxRecBuffer;
                     Conf.MaxSendBuffer = MaxSendBuffer;
-                    Conf.MaxStreamPool = MaxStreamPool;
+                    Conf.UnreliableStreamPool = UnreliableMaxStreamPool;
+                    Conf.AutoAllocStreams = AutoAllocateStreams;
 #if ATOM_BANDWIDTH_COUNTER
                     Conf.BandwidthTimeout = BandwidthTimeout;
 #endif
@@ -140,6 +153,7 @@ namespace Atom.Core
                     Conf.SendTimeout = SendTimeout;
                     Conf.PingFrequency = PingFrequency;
                     Conf.Addresses = Addresses;
+                    Conf.ReliableStreamPool = ReliableMaxStreamPool;
                     SaveSettingsFile();
                 }
             }
@@ -153,7 +167,7 @@ namespace Atom.Core
             MaxPlayers = Conf.MaxPlayers;
             MaxRecBuffer = Conf.MaxRecBuffer;
             MaxSendBuffer = Conf.MaxSendBuffer;
-            MaxStreamPool = Conf.MaxStreamPool;
+            UnreliableMaxStreamPool = Conf.UnreliableStreamPool;
 #if ATOM_BANDWIDTH_COUNTER
             BandwidthTimeout = Conf.BandwidthTimeout;
 #endif
@@ -163,6 +177,8 @@ namespace Atom.Core
             SendTimeout = Conf.SendTimeout;
             PingFrequency = Conf.PingFrequency;
             Addresses = Conf.Addresses;
+            ReliableMaxStreamPool = Conf.ReliableStreamPool;
+            AutoAllocateStreams = Conf.AutoAllocStreams;
         }
 #endif
     }
