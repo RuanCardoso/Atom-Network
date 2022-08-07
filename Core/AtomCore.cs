@@ -90,9 +90,12 @@ namespace Atom.Core
         [Range(0.1f, 10f)] public float PingFrequency;
         [Foldout("Settings Manager/Server")][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
 #endif
-        [Foldout("Junk Internet Simulator")][SerializeField] private bool IsOn;
-        [Label("Drop(%)")][Range(1, 100)] public int DropPercentage;
-        [Label("Lag(ms)")][Range(1, 1000)] public int DelayPercentage;
+        [NaughtyAttributes.InfoBox("Alternative, use https://github.com/jagt/clumsy", NaughtyAttributes.EInfoBoxType.Normal)]
+        [Foldout("Junk Internet Simulator")][SerializeField] internal bool IsOn = false;
+        [SerializeField][ReadOnly] private bool SimulateOnServer = true;
+        [SerializeField][ReadOnly] private bool SimulateOnClient = true;
+        [Label("Drop(%)")][Range(1, 100)] public int DropPercentage = 1;
+        [Label("Lag(ms)")][Range(1, 120)] public int DelayPercentage = 1;
 
         private void Awake()
         {
@@ -108,6 +111,9 @@ namespace Atom.Core
             NetworkTime = Time.timeAsDouble;
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 60;
+            /******************************************/
+            SimulateOnClient = SimulateOnServer = true;
+            SimulateOnServer = SimulateOnClient = true;
         }
 
         private void Update()

@@ -31,6 +31,7 @@ namespace Atom.Core
 
         public static double LostMessages => Math.Abs(Math.Round(100d - ((_receivedMessages / _messagesSent) * 100d), MidpointRounding.ToEven));
         public static double Latency => Math.Round((RoundTripTime * 0.5d) * 1000d);
+        public static double Ping => Math.Round((RoundTripTime) * 1000d);
         public static double RoundTripTime => _rttExAvg.Avg;
         public static double LocalTime => AtomCore.NetworkTime;
         public static double Time => LocalTime + (Offset * -1);

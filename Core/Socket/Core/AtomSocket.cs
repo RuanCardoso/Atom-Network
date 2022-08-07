@@ -484,9 +484,10 @@ namespace Atom.Core
                     {
                         int bytesTransferred = _socket.ReceiveFrom(buffer, ref _peerEndPoint);
                         /*********************************************************************/
-                        if (Module.Drop())
+                        if (Module.Drop() && IsServer)
                             continue;
-                        Thread.Sleep(Module.DelayPercentage);
+                        if (Module.IsOn && IsServer)
+                            Thread.Sleep(Module.DelayPercentage);
                         /*********************************************************************/
                         if (bytesTransferred >= 0)
                         {
