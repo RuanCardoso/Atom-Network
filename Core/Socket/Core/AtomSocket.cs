@@ -190,44 +190,51 @@ namespace Atom.Core
             while (true)
             {
                 if (!IsServer && _id == 0)
-                    yield return null;
-
-                for (int channelIndex = 0; channelIndex < _channelModes.Length; channelIndex++)
                 {
-                    Channel channel = _channelModes[channelIndex];
-                    if (channel == Channel.Reliable || channel == Channel.ReliableAndOrderly)
+                    yield return null;
+                    continue;
+                }
+#if UNITY_SERVER || UNITY_EDITOR
+                for (int pId = 1; pId <= Conf.MaxPlayers; pId++)
+#else
+                int pId = _id;
+#endif
+                {
+#if UNITY_SERVER || UNITY_EDITOR
+                    if (!_clientsById[pId].IsConnected)
+                        continue;
+#endif
+                    for (int channelIndex = 1; channelIndex < _channelModes.Length; channelIndex++)
                     {
-                        for (int pId = 1; pId <= Conf.MaxPlayers; pId++)
+                        Channel channel = _channelModes[channelIndex];
+                        AtomChannel atomChannel = _channels[(pId, (byte)channel)];
+                        foreach (var (msgKey, message) in atomChannel.MessagesToRelay)
                         {
-                            if (!_clientsById[pId].IsConnected)
-                                yield return null;
-
-                            AtomChannel atomChannel = _channels[(pId, (byte)channel)];
-                            foreach (var (msgKey, message) in atomChannel.MessagesToRelay)
+                            if (DateTime.UtcNow.Subtract(message.LastTime).TotalSeconds >= 0.2d)
                             {
-                                if (DateTime.UtcNow.Subtract(message.LastTime).TotalSeconds >= 0.2d)
+                                if (message.PlayersToRelay.Count > 0)
                                 {
-                                    if (message.PlayersToRelay.Count > 0)
+                                    foreach (var (idOfPlayer, _) in message.PlayersToRelay)
                                     {
-                                        foreach (var (idOfPlayer, _) in message.PlayersToRelay)
-                                        {
-                                            int bytesWritten = message.BytesWritten;
-                                            byte[] buffer = message.GetBuffer();
-                                            Send(buffer, bytesWritten, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, idOfPlayer, 0, true);
-                                            AtomLogger.Print($"Relaying message to {idOfPlayer} {IsServer}");
-                                        }
+                                        int bytesWritten = message.BytesWritten;
+                                        byte[] buffer = message.GetBuffer();
+                                        Send(buffer, bytesWritten, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, idOfPlayer, 0, true);
+                                        message.LastTime = DateTime.UtcNow;
+                                        AtomLogger.Print($"Relaying message to {idOfPlayer} {IsServer}");
                                     }
-                                    else
+                                }
+                                else
+                                {
+                                    if (_channels[(pId, (byte)channel)].MessagesToRelay.TryRemove(msgKey, out _))
                                     {
-                                        if (_channels[(pId, (byte)channel)].MessagesToRelay.TryRemove(msgKey, out _))
-                                        {
-                                            message.Reset();
-                                            message.PlayersToRelay.Clear();
-                                            StreamsToWaitAck.Push(message);
-                                        }
+                                        message.Reset();
+                                        message.PlayersToRelay.Clear();
+                                        StreamsToWaitAck.Push(message);
                                     }
                                 }
                             }
+                            else
+                                continue;
                         }
                     }
                 }
@@ -543,7 +550,10 @@ namespace Atom.Core
                                         if (opMode == Operation.Acknowledgement)
                                         {
                                             AtomClient peer = IsServer ? _clientsByEndPoint[_peerEndPoint] : _clientsById[playerId];
-                                            if (!atomChannel.MessagesToRelay[seqAck].PlayersToRelay.TryRemove(peer.Id, out _)) { }
+                                            if (atomChannel.MessagesToRelay.TryGetValue(seqAck, out AtomStream messageToRelay))
+                                            {
+                                                if (!messageToRelay.PlayersToRelay.TryRemove(peer.Id, out _)) { }
+                                            }
                                         }
                                         else
                                         {

@@ -132,8 +132,10 @@ namespace Atom.Core
 
         private void OnApplicationQuit()
         {
-            _client.Close();
-            _server.Close();
+            if (_client != null)
+                _client.Close();
+            if (_server != null)
+                _server.Close();
         }
     }
 }
