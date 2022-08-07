@@ -37,19 +37,19 @@ namespace Atom.Core
         [Key(2)]
         public string Encoding = "ASCII";
         [Key(3)]
-        public int MaxUdpPacketSize = 128;
+        public int MaxUdpPacketSize = 512;
         [Key(4)]
-        public int MaxPlayers = 12;
+        public int MaxPlayers = 255;
         [Key(5)]
-        public int MaxRecBuffer = 1024;
+        public int MaxRecBuffer = 8192;
         [Key(6)]
-        public int MaxSendBuffer = 1024;
+        public int MaxSendBuffer = 8192;
         [Key(7)]
         public int ReceiveTimeout = -1;
         [Key(8)]
         public int SendTimeout = -1;
         [Key(9)]
-        public int UnreliableStreamPool = 128;
+        public int UnreliableStreamPool = 256;
         [Key(10)]
         public double BandwidthTimeout = 2;
         [Key(11)]
@@ -59,7 +59,7 @@ namespace Atom.Core
         [Key(13)]
         public bool IncrementalGc = true;
         [Key(14)]
-        public int ReliableStreamPool = 128;
+        public int ReliableStreamPool = 256;
         [Key(15)]
         public bool AutoAllocStreams = false;
     }

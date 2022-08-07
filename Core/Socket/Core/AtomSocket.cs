@@ -261,8 +261,12 @@ namespace Atom.Core
                                         socketClient.IsConnected = true;
                                         socketClient.EndPoint = new AtomEndPoint(_endPoint.GetIPAddress(), _endPoint.GetPort());
                                         _clientsByEndPoint.Add(socketClient.EndPoint, socketClient);
+                                        /**********************************************************/
+                                        double timeOfClient = reader.ReadDouble();
                                         writer.Write((byte)Message.ConnectAndPing);
                                         writer.Write(id);
+                                        writer.Write(timeOfClient);
+                                        writer.Write(AtomTime.LocalTime);
                                         SendToClient(writer, channelMode, targetMode, opMode, id);
                                     }
                                     else
@@ -274,11 +278,9 @@ namespace Atom.Core
                             else
                             {
                                 double timeOfClient = reader.ReadDouble();
-                                /****************************************************************/
                                 writer.Write((byte)Message.ConnectAndPing);
                                 writer.Write(timeOfClient);
                                 writer.Write(AtomTime.LocalTime);
-                                /****************************************************************/
                                 SendToClient(writer, channelMode, targetMode, opMode, playerId);
                             }
                         }
@@ -292,15 +294,17 @@ namespace Atom.Core
                                     AtomClient socketClient = _clientsById[_id];
                                     socketClient.IsConnected = true;
                                     socketClient.EndPoint = new AtomEndPoint(_endPoint.GetIPAddress(), _endPoint.GetPort());
+                                    /***************************************************************************************/
+                                    double timeOfClient = reader.ReadDouble();
+                                    double timeOfServer = reader.ReadDouble();
+                                    AtomTime.SetTime(timeOfClient, timeOfServer);
                                 }
                             }
                             else
                             {
                                 double timeOfClient = reader.ReadDouble();
                                 double timeOfServer = reader.ReadDouble();
-                                /****************************************************************/
                                 AtomTime.SetTime(timeOfClient, timeOfServer);
-                                /****************************************************************/
                                 AtomTime.AddReceived();
                             }
                         }

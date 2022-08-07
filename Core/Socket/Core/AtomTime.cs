@@ -34,11 +34,11 @@ namespace Atom.Core
         public static double Latency => Math.Round((RoundTripTime * 0.5d) * 1000d);
         public static double Ping => Math.Round(RoundTripTime * 1000d);
         public static double RoundTripTime => _rttExAvg.Avg;
+        public static double Offset => _offsetExAvg.Avg;
         public static double LocalTime => AtomCore.NetworkTime;
-        public static double Time => LocalTime + (Offset * -1);
+        public static double Time => LocalTime - Offset;
         public static double RttSlope => _rttExAvg.Slope;
         public static double OffsetSlope => _offsetExAvg.Slope;
-        public static double Offset => _offsetExAvg.Avg;
 
         public static void SetTime(double clientTime, double serverTime)
         {

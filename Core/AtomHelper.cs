@@ -58,11 +58,11 @@ namespace Atom.Core
             MessagePackSerializer.DefaultOptions = MessagePackSerializerOptions.Standard.WithResolver(resolver);
         }
 
-        public static bool Interval(ref double lastTime, double interval)
+        public static bool Interval(ref double lastTime, double interval, bool networkTime = false)
         {
-            if (AtomTime.LocalTime >= lastTime + interval)
+            if ((!networkTime ? AtomTime.LocalTime : AtomTime.Time) >= lastTime + interval)
             {
-                lastTime = AtomTime.LocalTime;
+                lastTime = !networkTime ? AtomTime.LocalTime : AtomTime.Time;
                 return true;
             }
             else

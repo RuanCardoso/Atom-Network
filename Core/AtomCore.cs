@@ -99,7 +99,12 @@ namespace Atom.Core
 
         private void Awake()
         {
-            Module = this;
+            DontDestroyOnLoad(this);
+            if (Module == null)
+                Module = this;
+            else
+                Destroy(gameObject);
+
             NetworkTime = Time.timeAsDouble;
             LoadSettingsFile();
             Streams = new(() => new(true, false, false), Conf.UnreliableStreamPool, Conf.AutoAllocStreams, true, "AtomStreamPool");
