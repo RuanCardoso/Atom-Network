@@ -76,6 +76,7 @@ namespace Atom.Core
              Channel.ReliableAndOrderly
          };
 
+        private MonoBehaviour _this;
         /// <summary> Id of connection, used to identify the connection.</summary>
         private int _id = 0;
         /// <summary>\
@@ -140,11 +141,13 @@ namespace Atom.Core
             _ids.Sort();
         }
 
-        public void Initialize(string address, int port, bool isServer)
+        public void Initialize(string address, int port, bool isServer, MonoBehaviour _this)
         {
+            this._this = _this;
             IsServer = isServer;
             // Initialize the constructor!
             __Constructor__(new IPEndPoint(IPAddress.Parse(address), port));
+            this._this.StartCoroutine(Relay()); // Start relaying the messages to the clients.
             // Start the receive thread.
             // The Unity API doesn't allow to be called from a thread other than the main thread.
             // The Unity API wil be dispatched to the main thread.
@@ -154,11 +157,11 @@ namespace Atom.Core
             Receive();
         }
 
-        public void Connect(string address, int port, MonoBehaviour _this)
+        public void Connect(string address, int port)
         {
             IsServer = false;
+            /**************************************************/
             _this.StartCoroutine(ConnectAndPing(address, port));
-            _this.StartCoroutine(Relay());
         }
 
         private WaitForSeconds _pingWaiter;
@@ -186,6 +189,9 @@ namespace Atom.Core
         {
             while (true)
             {
+                if (!IsServer && _id == 0)
+                    yield return null;
+
                 for (int channelIndex = 0; channelIndex < _channelModes.Length; channelIndex++)
                 {
                     Channel channel = _channelModes[channelIndex];
@@ -196,26 +202,26 @@ namespace Atom.Core
                             if (!_clientsById[pId].IsConnected)
                                 yield return null;
 
-                            var messages = _channels[(pId, (byte)channel)].MessagesToRelay.ToList();
-                            for (int messageIndex = 0; messageIndex < messages.Count; messageIndex++)
+                            AtomChannel atomChannel = _channels[(pId, (byte)channel)];
+                            foreach (var (msgKey, message) in atomChannel.MessagesToRelay)
                             {
-                                AtomStream message = messages[messageIndex].Value;
                                 if (DateTime.UtcNow.Subtract(message.LastTime).TotalSeconds >= 0.2d)
                                 {
                                     if (message.PlayersToRelay.Count > 0)
                                     {
-                                        foreach (var (playerId_, _playerId) in message.PlayersToRelay.ToList())
+                                        foreach (var (idOfPlayer, _) in message.PlayersToRelay)
                                         {
-                                            int countBytes = message.BytesWritten;
-                                            byte[] data = message.GetBuffer();
-                                            Send(data, countBytes, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, _playerId, 0, true);
-                                            AtomLogger.Print($"Relaying message to {_playerId} {IsServer}");
+                                            int bytesWritten = message.BytesWritten;
+                                            byte[] buffer = message.GetBuffer();
+                                            Send(buffer, bytesWritten, Target.Single, channel, !IsServer ? Operation.Sequence : Operation.Data, idOfPlayer, 0, true);
+                                            AtomLogger.Print($"Relaying message to {idOfPlayer} {IsServer}");
                                         }
                                     }
                                     else
                                     {
-                                        if (_channels[(pId, (byte)channel)].MessagesToRelay.TryRemove(messages[messageIndex].Key, out _))
+                                        if (_channels[(pId, (byte)channel)].MessagesToRelay.TryRemove(msgKey, out _))
                                         {
+                                            message.Reset();
                                             message.PlayersToRelay.Clear();
                                             StreamsToWaitAck.Push(message);
                                         }
@@ -286,7 +292,6 @@ namespace Atom.Core
                                     AtomClient socketClient = _clientsById[_id];
                                     socketClient.IsConnected = true;
                                     socketClient.EndPoint = new AtomEndPoint(_endPoint.GetIPAddress(), _endPoint.GetPort());
-                                    AtomLogger.Print("Client connected!");
                                 }
                             }
                             else
@@ -350,9 +355,9 @@ namespace Atom.Core
             if (messageStream.FixedSize && (data.Length + defSize) != messageStream.Length)
                 throw new Exception("[Atom] -> The size of the packet is not correct. You setted " + messageStream.Length + " but you need " + (data.Length + defSize) + ".");
 #endif
-            int countBytes = messageStream.BytesWritten;
+            int bytesWritten = messageStream.BytesWritten;
             messageStream.Reset(pos: defSize);
-            messageStream.Write(data, 0, countBytes);
+            messageStream.Write(data, 0, bytesWritten);
             messageStream.Position = 0;
 #if ATOM_DEBUG
             if (((byte)channelMode) > CHANNEL_MASK || ((byte)targetMode) > TARGET_MASK || ((byte)opMode) > OPERATION_MASK)
@@ -374,14 +379,14 @@ namespace Atom.Core
             {
                 atomChannel = _channels[(playerId, (byte)channelMode)];
                 if (seqAck == 0)
-                    seqAck = Interlocked.Increment(ref atomChannel.sentAck);
+                    seqAck = Interlocked.Increment(ref atomChannel.nextSeqAck);
                 messageStream.Write(seqAck);
             }
             /*************************************************************************************/
             messageStream.Position = messageStream.BytesWritten;
             byte[] _data = messageStream.GetBuffer();
-            countBytes = messageStream.BytesWritten;
-            Send(_data, countBytes, targetMode, channelMode, opMode, playerId, seqAck, false);
+            bytesWritten = messageStream.BytesWritten;
+            Send(_data, bytesWritten, targetMode, channelMode, opMode, playerId, seqAck, false);
         }
 
         private object _lock = new();
@@ -419,10 +424,8 @@ namespace Atom.Core
                                     AtomClient client = _clientsByIdToList[i];
                                     if (!client.IsConnected)
                                         return;
-
                                     endPoint = _clientsById[client.Id].EndPoint;
-                                    if (isValid)
-                                        waitAck.PlayersToRelay.TryAdd(client.Id, client.Id);
+                                    if (isValid) waitAck.PlayersToRelay.TryAdd(client.Id, client.Id);
                                     sendTo = _socket.SendTo(data, length, SocketFlags.None, endPoint);
                                 }
                             }
@@ -431,8 +434,7 @@ namespace Atom.Core
                             break;
                         case Target.Single:
                             {
-                                if (isValid)
-                                    waitAck.PlayersToRelay.TryAdd(playerId, playerId);
+                                if (isValid) waitAck.PlayersToRelay.TryAdd(playerId, playerId);
                                 sendTo = _socket.SendTo(data, length, SocketFlags.None, endPoint);
                             }
                             break;
@@ -440,8 +442,7 @@ namespace Atom.Core
                 }
                 else
                 {
-                    if (isValid)
-                        waitAck.PlayersToRelay.TryAdd(playerId, playerId);
+                    if (isValid) waitAck.PlayersToRelay.TryAdd(playerId, playerId);
                     sendTo = _socket.SendTo(data, length, SocketFlags.None, endPoint);
                 }
             }
@@ -482,6 +483,11 @@ namespace Atom.Core
                     while (!_cancelTokenSource.IsCancellationRequested)
                     {
                         int bytesTransferred = _socket.ReceiveFrom(buffer, ref _peerEndPoint);
+                        /*********************************************************************/
+                        if (Module.Drop())
+                            continue;
+                        Thread.Sleep(Module.DelayPercentage);
+                        /*********************************************************************/
                         if (bytesTransferred >= 0)
                         {
 #if ATOM_BANDWIDTH_COUNTER
@@ -531,7 +537,7 @@ namespace Atom.Core
                                         if (opMode == Operation.Acknowledgement)
                                         {
                                             AtomClient peer = IsServer ? _clientsByEndPoint[_peerEndPoint] : _clientsById[playerId];
-                                            if (!atomChannel.MessagesToRelay[seqAck].PlayersToRelay.TryRemove(peer.Id, out _)) { AtomLogger.PrintError("[Atom] -> The player with the id " + peer.Id + " does not exist!"); }
+                                            if (!atomChannel.MessagesToRelay[seqAck].PlayersToRelay.TryRemove(peer.Id, out _)) { }
                                         }
                                         else
                                         {
@@ -542,7 +548,7 @@ namespace Atom.Core
                                             {
                                                 case Channel.Reliable:
                                                     {
-                                                        if (!atomChannel.Acks.Add(seqAck))
+                                                        if (!atomChannel.ReliableAcks.Add(seqAck))
                                                             continue;
 
                                                         internal_iCall(data, length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
@@ -551,23 +557,29 @@ namespace Atom.Core
 
                                                 case Channel.ReliableAndOrderly:
                                                     {
-                                                        if ((seqAck < atomChannel.ExpectedAck) || !atomChannel.Acks.Add(seqAck))
+                                                        HashSet<int> reliableAcks = atomChannel.ReliableAcks;
+                                                        if ((seqAck < atomChannel.ExpectedAck) || !reliableAcks.Add(seqAck))
                                                             continue;
 
-                                                        byte[] _data_ = data.ToArray();
-                                                        int min = atomChannel.Acks.Min();
-                                                        int max = atomChannel.Acks.Max();
-                                                        atomChannel.SequentialData.Add(seqAck, _data_);
+                                                        int min = reliableAcks.Min();
+                                                        int max = reliableAcks.Max();
+                                                        AtomStream orderlyStream = StreamsToWaitAck.Pull();
+                                                        orderlyStream.Write(data, 0, length);
+                                                        atomChannel.SequentialData.Add(seqAck, orderlyStream);
                                                         if (min == atomChannel.ExpectedAck)
                                                         {
                                                             int range = max - (min - 1);
-                                                            if (atomChannel.Acks.Count == range)
+                                                            if (reliableAcks.Count == range)
                                                             {
-                                                                foreach (var (key, value) in atomChannel.SequentialData)
-                                                                    internal_iCall(value, value.Length, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                                foreach (var (_, seqStream) in atomChannel.SequentialData)
+                                                                {
+                                                                    internal_iCall(seqStream.GetBuffer(), seqStream.BytesWritten, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                                    seqStream.Reset();
+                                                                    StreamsToWaitAck.Push(seqStream);
+                                                                }
 
                                                                 atomChannel.ExpectedAck = max + 1;
-                                                                atomChannel.Acks.Clear();
+                                                                reliableAcks.Clear();
                                                                 atomChannel.SequentialData.Clear();
                                                             }
                                                             else { /* Get missing messages  */}
@@ -577,7 +589,6 @@ namespace Atom.Core
                                                     }
                                             }
                                         }
-
                                         break;
                                     }
 
@@ -630,8 +641,8 @@ namespace Atom.Core
         {
             try
             {
-                _socket.Close();
                 _cancelTokenSource.Cancel();
+                _socket.Close();
             }
             finally
             {

@@ -24,7 +24,7 @@ namespace Atom.Core.Wrappers
     public class AtomStream : IDisposable
     {
         internal ConcurrentDictionary<int, int> PlayersToRelay { get; } = new();
-        private int _countBytes;
+        private int _bytesWritten;
         private readonly MemoryStream _memoryStream;
         private readonly byte[] _buffer;
         private readonly byte[] _memoryBuffer;
@@ -44,7 +44,7 @@ namespace Atom.Core.Wrappers
 
         public bool FixedSize => _fixedSize;
         public int Length => _size;
-        public int BytesWritten => _countBytes;
+        public int BytesWritten => _bytesWritten;
         public int BytesRemaining => (int)(BytesWritten - Position);
         public DateTime LastTime { get => _lastTime; set => _lastTime = value; }
 
@@ -148,7 +148,7 @@ namespace Atom.Core.Wrappers
         public void Write(byte value)
         {
             _memoryStream.WriteByte(value);
-            _countBytes += 1;
+            _bytesWritten += 1;
         }
 
         public byte ReadByte() => (byte)_memoryStream.ReadByte();
@@ -332,6 +332,12 @@ namespace Atom.Core.Wrappers
             return _buffer;
         }
 
+        public byte[] ReadNext(int size)
+        {
+            Read(size);
+            return _buffer;
+        }
+
         private void Read(int count, int offset = 0)
         {
 #if ATOM_DEBUG
@@ -364,7 +370,7 @@ namespace Atom.Core.Wrappers
             {
 #endif
                 _memoryStream.Write(buffer, offset, count);
-                _countBytes += count;
+                _bytesWritten += count;
 #if ATOM_DEBUG
             }
             catch (NotSupportedException ex)
@@ -385,7 +391,7 @@ namespace Atom.Core.Wrappers
             {
 #endif
                 _memoryStream.Write(buffer);
-                _countBytes += buffer.Length;
+                _bytesWritten += buffer.Length;
 #if ATOM_DEBUG
             }
             catch (NotSupportedException ex)
@@ -416,7 +422,7 @@ namespace Atom.Core.Wrappers
             if (!_fixedSize) // GC Alloc Here
             {
                 ReadOnlySpan<byte> _buffer = _memoryBuffer;
-                return _buffer[.._countBytes].ToArray();
+                return _buffer[.._bytesWritten].ToArray();
             }
             else
                 return _memoryBuffer;
@@ -427,13 +433,13 @@ namespace Atom.Core.Wrappers
         public ReadOnlySpan<byte> GetBufferAsReadOnlySpan()
         {
             ReadOnlySpan<byte> _buffer = _memoryBuffer;
-            return _buffer[.._countBytes];
+            return _buffer[.._bytesWritten];
         }
 
         public void Reset(int pos = 0, int countBytes = 0)
         {
             _memoryStream.Position = pos;
-            _countBytes = countBytes;
+            _bytesWritten = countBytes;
         }
 
         public void Seek(long offset, SeekOrigin seekOrigin)
@@ -470,7 +476,7 @@ namespace Atom.Core.Wrappers
         {
             var atomStream = AtomCore.Streams.Pull();
 #if ATOM_DEBUG
-            return atomStream._countBytes != 0
+            return atomStream._bytesWritten != 0
                 ? throw new Exception("AtomStream: A item has been modified while it was in the pool!")
                 : atomStream;
 #else

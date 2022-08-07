@@ -17,9 +17,11 @@ using Atom.Core.Attributes;
 using Atom.Core.Wrappers;
 using MarkupAttributes;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using static Atom.Core.AtomGlobal;
+using Random = System.Random;
 
 namespace Atom.Core
 {
@@ -80,14 +82,18 @@ namespace Atom.Core
         public int ReceiveTimeout;
         public int SendTimeout;
         [NaughtyAttributes.InfoBox("Avoid using items from the pool to avoid allocating new objects when there are no items available!", NaughtyAttributes.EInfoBoxType.Warning)]
-        [Foldout("Settings Manager/Global/Pools")][Label("Unreliable Streams")] public int UnreliableMaxStreamPool;
-        [Label("Reliable Streams")] public int ReliableMaxStreamPool;
+        [Foldout("Settings Manager/Global/Pools")][HideIf("AutoAllocateStreams")][Label("Unreliable Streams")] public int UnreliableMaxStreamPool;
+        [HideIf("AutoAllocateStreams")][Label("Reliable Streams")] public int ReliableMaxStreamPool;
         [NaughtyAttributes.InfoBox("It can significantly affect performance!", NaughtyAttributes.EInfoBoxType.Warning)]
         [Label("Auto Resize Pool")] public bool AutoAllocateStreams;
         [Foldout("Settings Manager/Client")] public string[] Addresses;
         [Range(0.1f, 10f)] public float PingFrequency;
         [Foldout("Settings Manager/Server")][NaughtyAttributes.InfoBox("<= 255 = 1 Byte || > 255 <= 65535 = 2 Byte || 4 Byte", NaughtyAttributes.EInfoBoxType.Normal)] public int MaxPlayers;
 #endif
+        [Foldout("Junk Internet Simulator")][SerializeField] private bool IsOn;
+        [Label("Drop(%)")][Range(1, 100)] public int DropPercentage;
+        [Label("Lag(ms)")][Range(1, 1000)] public int DelayPercentage;
+
         private void Awake()
         {
             Module = this;
@@ -108,6 +114,9 @@ namespace Atom.Core
         {
             NetworkTime = Time.timeAsDouble;
         }
+
+        Random random = new();
+        public bool Drop() => IsOn && random.Next(1, 101) <= DropPercentage;
 
 #if UNITY_EDITOR
         [ContextMenu("Save Settings")]

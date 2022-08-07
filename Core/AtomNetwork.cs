@@ -37,7 +37,7 @@ namespace Atom.Core
             try
             {
                 _server = new(this);
-                _server.Initialize("0.0.0.0", 5055, true);
+                _server.Initialize("0.0.0.0", 5055, true, this);
             }
             catch (SocketException ex)
             {
@@ -47,7 +47,7 @@ namespace Atom.Core
 #endif
 #if !UNITY_SERVER || UNITY_EDITOR
             _client = new(this);
-            _client.Initialize("0.0.0.0", GetFreePort(), false);
+            _client.Initialize("0.0.0.0", GetFreePort(), false, this);
 #endif
         }
 
@@ -55,7 +55,7 @@ namespace Atom.Core
         {
 #if !UNITY_SERVER || UNITY_EDITOR
             string[] address = Conf.Addresses[0].Split(':');
-            _client.Connect(address[0], int.Parse(address[1]), this);
+            _client.Connect(address[0], int.Parse(address[1]));
 #endif
 #if UNITY_SERVER
             Console.Clear();

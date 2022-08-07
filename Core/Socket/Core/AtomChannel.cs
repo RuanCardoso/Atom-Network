@@ -25,10 +25,10 @@ namespace Atom.Core
 {
     public class AtomChannel
     {
-        internal int sentAck = 0;
+        internal int nextSeqAck = 0;
         internal ConcurrentDictionary<int, AtomStream> MessagesToRelay = new();
-        internal SortedDictionary<int, byte[]> SequentialData = new();
-        internal HashSet<int> Acks = new();
+        internal SortedDictionary<int, AtomStream> SequentialData = new();
+        internal HashSet<int> ReliableAcks = new();
         internal int ExpectedAck { get; set; } = 1;
     }
 }
