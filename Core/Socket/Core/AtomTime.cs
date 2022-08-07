@@ -1,5 +1,5 @@
 /*===========================================================
-    Author: Ruan Cardoso
+    Author: Ruan Cardoso, Vis2k(Mirror)
     -
     Country: Brazil(Brasil)
     -
@@ -10,28 +10,29 @@
     Unity Minor Version: 2021.3 LTS
     -
     License: Open Source (MIT)
+    -
+    Thanks: https://github.com/vis2k/Mirror/blob/master/Assets/Mirror/Runtime/NetworkTime.cs
     ===========================================================*/
 
 #if UNITY_2021_3_OR_NEWER
-using Atom.Core.Objects;
 using System;
-using System.Diagnostics;
+using Atom.Core.Objects;
 
 namespace Atom.Core
 {
     public static class AtomTime
     {
-        const int SIZE = 10;
-        private static double _receivedMessages = 1d;
-        private static double _messagesSent = 1d;
+        private const int WINDOW_SIZE = 10;
+        private static double _recMsgs = 1d;
+        private static double _sentMsgs = 1d;
+        private static ExponentialMovingAverage _rttExAvg = new(WINDOW_SIZE);
+        private static ExponentialMovingAverage _offsetExAvg = new(WINDOW_SIZE);
         private static double _offsetMin = double.MinValue;
         private static double _offsetMax = double.MaxValue;
-        private static readonly ExpAvg _rttExAvg = new(SIZE);
-        private static readonly ExpAvg _offsetExAvg = new(SIZE);
 
-        public static double LostMessages => Math.Abs(Math.Round(100d - ((_receivedMessages / _messagesSent) * 100d), MidpointRounding.ToEven));
+        public static double PacketLoss => Math.Abs(Math.Round(100d - ((_recMsgs / _sentMsgs) * 100d), MidpointRounding.ToEven));
         public static double Latency => Math.Round((RoundTripTime * 0.5d) * 1000d);
-        public static double Ping => Math.Round((RoundTripTime) * 1000d);
+        public static double Ping => Math.Round(RoundTripTime * 1000d);
         public static double RoundTripTime => _rttExAvg.Avg;
         public static double LocalTime => AtomCore.NetworkTime;
         public static double Time => LocalTime + (Offset * -1);
@@ -51,18 +52,18 @@ namespace Atom.Core
             _offsetMin = Math.Max(_offsetMin, offsetMin);
             _offsetMax = Math.Min(_offsetMax, offsetMax);
 
-            _rttExAvg.Increment(rtt);
+            _rttExAvg.Add(rtt);
             if (_offsetExAvg.Avg < _offsetMin || _offsetExAvg.Avg > _offsetMax)
             {
-                _offsetExAvg.Reset(SIZE);
-                _offsetExAvg.Increment(offset);
+                _offsetExAvg = new ExponentialMovingAverage(WINDOW_SIZE);
+                _offsetExAvg.Add(offset);
             }
             else if (offset >= _offsetMin || offset <= _offsetMax)
-                _offsetExAvg.Increment(offset);
+                _offsetExAvg.Add(offset);
         }
 
-        public static void AddSent() => _messagesSent++;
-        public static void AddReceived() => _receivedMessages++;
+        public static void AddSent() => _sentMsgs++;
+        public static void AddReceived() => _recMsgs++;
     }
 }
 #endif
