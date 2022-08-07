@@ -66,11 +66,11 @@ namespace Atom.Core
 
     public class AtomGlobal
     {
+        public const int MAX_PLAYERS = Int32.MaxValue;
         private const string FILE_NAME = "atom";
         private const string RES_PATH = "./Assets/Resources";
         private const string PATH = RES_PATH + "/" + FILE_NAME + ".json";
         private const int MIN_MTU = 512;
-        public const int MAX_PLAYERS = byte.MaxValue * 64;
         private static readonly bool _AOT_;
         private static bool _INIT_;
 

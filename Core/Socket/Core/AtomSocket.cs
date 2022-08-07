@@ -486,7 +486,8 @@ namespace Atom.Core
                         /*********************************************************************/
                         if (Module.Drop() && IsServer)
                             continue;
-                        if (Module.IsOn && IsServer)
+                        if (Module.IsOn && (IsServer && Module.SimulateOnServer)
+                        || Module.IsOn && (!IsServer && Module.SimulateOnClient))
                             Thread.Sleep(Module.DelayPercentage);
                         /*********************************************************************/
                         if (bytesTransferred >= 0)
@@ -574,7 +575,8 @@ namespace Atom.Core
                                                             {
                                                                 foreach (var (_, seqStream) in atomChannel.SequentialData)
                                                                 {
-                                                                    internal_iCall(seqStream.GetBuffer(), seqStream.BytesWritten, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
+                                                                    byte[] _data_ = seqStream.GetBuffer();
+                                                                    internal_iCall(_data_, seqStream.BytesWritten, playerId, _peerEndPoint, channelMode, targetMode, opMode, IsServer);
                                                                     seqStream.Reset();
                                                                     StreamsToWaitAck.Push(seqStream);
                                                                 }

@@ -92,10 +92,10 @@ namespace Atom.Core
 #endif
         [NaughtyAttributes.InfoBox("Alternative, use https://github.com/jagt/clumsy", NaughtyAttributes.EInfoBoxType.Normal)]
         [Foldout("Junk Internet Simulator")][SerializeField] internal bool IsOn = false;
-        [SerializeField][ReadOnly] private bool SimulateOnServer = true;
-        [SerializeField][ReadOnly] private bool SimulateOnClient = true;
+        [SerializeField] internal bool SimulateOnServer = true;
+        [SerializeField] internal bool SimulateOnClient = true;
         [Label("Drop(%)")][Range(1, 100)] public int DropPercentage = 1;
-        [Label("Lag(ms)")][Range(1, 120)] public int DelayPercentage = 1;
+        [Label("Lag(ms)")][Range(1, 45)] public int DelayPercentage = 1;
 
         private void Awake()
         {
